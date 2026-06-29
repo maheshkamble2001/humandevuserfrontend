@@ -1,0 +1,14 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  background: radial-gradient(circle at top, #0f172a, #05070f);
+  color: white;
+  font-family: "Inter", system-ui;
+}
+
+/* system glow effect */
+.glow {
+  box-shadow: 0 0 15px rgba(0, 229, 255, 0.15);
+}
