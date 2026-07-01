@@ -17,6 +17,9 @@ import {
   Flame,
   Star,
   Users,
+  UsersIcon,
+  Gamepad2,
+  BarChart3,
 } from 'lucide-react';
 
 // Import StatsCard and specialized cards
@@ -313,6 +316,43 @@ const Dashboard = () => {
 
             {/* Quick Actions */}
             <QuickActions />
+            {/* Quick Links to New Features */}
+            <div className="bg-white/10 backdrop-blur-lg rounded-xl p-6 border border-white/20">
+              <h2 className="text-lg font-semibold mb-4 flex items-center space-x-2">
+                <Sparkles className="w-5 h-5 text-purple-400" />
+                <span>Quick Access</span>
+              </h2>
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  onClick={() => navigate('/achievements')}
+                  className="p-3 bg-white/5 rounded-lg hover:bg-white/10 transition text-center group"
+                >
+                  <Award className="w-6 h-6 text-yellow-400 mx-auto mb-1" />
+                  <span className="text-xs text-gray-300 group-hover:text-white">Achievements</span>
+                </button>
+                <button
+                  onClick={() => navigate('/analytics')}
+                  className="p-3 bg-white/5 rounded-lg hover:bg-white/10 transition text-center group"
+                >
+                  <BarChart3 className="w-6 h-6 text-blue-400 mx-auto mb-1" />
+                  <span className="text-xs text-gray-300 group-hover:text-white">Analytics</span>
+                </button>
+                <button
+                  onClick={() => navigate('/challenges')}
+                  className="p-3 bg-white/5 rounded-lg hover:bg-white/10 transition text-center group"
+                >
+                  <Gamepad2 className="w-6 h-6 text-purple-400 mx-auto mb-1" />
+                  <span className="text-xs text-gray-300 group-hover:text-white">Challenges</span>
+                </button>
+                <button
+                  onClick={() => navigate('/community')}
+                  className="p-3 bg-white/5 rounded-lg hover:bg-white/10 transition text-center group"
+                >
+                  <UsersIcon className="w-6 h-6 text-green-400 mx-auto mb-1" />
+                  <span className="text-xs text-gray-300 group-hover:text-white">Community</span>
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       </div>

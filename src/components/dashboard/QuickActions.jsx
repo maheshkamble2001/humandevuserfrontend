@@ -54,6 +54,8 @@ import {
   Bookmark,
   Flag,
   MoreVertical,
+  BarChart3,
+  Gamepad2,
 } from 'lucide-react';
 import { useAI } from '../../hooks/useAI';
 import { useAuth } from '../../hooks/useAuth';
@@ -67,7 +69,7 @@ const QuickActions = () => {
   const { user } = useAuth();
   const { getAdvice, getMotivation, generateMissions } = useAI();
   const { profile } = useSelector(state => state.user);
-  
+
   const [isExpanded, setIsExpanded] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [showAllActions, setShowAllActions] = useState(false);
@@ -240,6 +242,54 @@ const QuickActions = () => {
         }
       },
     },
+    {
+      id: 'achievements',
+      icon: Award,
+      label: 'Achievements',
+      description: 'View your achievements',
+      color: 'from-yellow-500 to-orange-500',
+      bgColor: 'bg-yellow-500/10',
+      textColor: 'text-yellow-400',
+      action: () => {
+        navigate('/achievements');
+      },
+    },
+    {
+      id: 'analytics',
+      icon: BarChart3,
+      label: 'Analytics',
+      description: 'View your progress',
+      color: 'from-blue-500 to-cyan-500',
+      bgColor: 'bg-blue-500/10',
+      textColor: 'text-blue-400',
+      action: () => {
+        navigate('/analytics');
+      },
+    },
+    {
+      id: 'challenges',
+      icon: Gamepad2,
+      label: 'Challenges',
+      description: 'Play mini-games',
+      color: 'from-purple-500 to-pink-500',
+      bgColor: 'bg-purple-500/10',
+      textColor: 'text-purple-400',
+      action: () => {
+        navigate('/challenges');
+      },
+    },
+    {
+      id: 'community',
+      icon: Users,
+      label: 'Community',
+      description: 'Connect with others',
+      color: 'from-green-500 to-emerald-500',
+      bgColor: 'bg-green-500/10',
+      textColor: 'text-green-400',
+      action: () => {
+        navigate('/community');
+      },
+    },
   ];
 
   // Load custom actions from localStorage
@@ -272,7 +322,7 @@ const QuickActions = () => {
     }
 
     const IconComponent = availableIcons[newActionIcon] || Zap;
-    
+
     const newAction = {
       id: `custom-${Date.now()}`,
       icon: IconComponent,
@@ -369,7 +419,7 @@ const QuickActions = () => {
           {quickActions.map((action, index) => {
             const Icon = action.icon;
             const isActive = activeAction === action.id;
-            
+
             return (
               <motion.button
                 key={action.id}
@@ -479,7 +529,7 @@ const QuickActions = () => {
                     <X className="w-5 h-5 text-gray-400" />
                   </button>
                 </div>
-                
+
                 <div className="p-4 bg-white/5 rounded-lg mb-4">
                   <p className="text-sm text-gray-300 whitespace-pre-wrap">
                     {actionResult.content}
@@ -532,7 +582,7 @@ const QuickActions = () => {
             >
               <div className="p-6">
                 <h3 className="text-lg font-bold text-white mb-4">Add Custom Action</h3>
-                
+
                 <div className="space-y-4">
                   <Input
                     label="Action Name"

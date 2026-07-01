@@ -5,6 +5,7 @@ import missionReducer from './slices/missionSlice';
 import habitReducer from './slices/habitSlice';
 import aiReducer from './slices/aiSlice';
 import uiReducer from './slices/uiSlice';
+import achievementReducer from './slices/achievementSlice';
 
 export const store = configureStore({
   reducer: {
@@ -13,6 +14,7 @@ export const store = configureStore({
     habits: habitReducer,
     ai: aiReducer,
     ui: uiReducer,
+    achievements: achievementReducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({
