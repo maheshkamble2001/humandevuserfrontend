@@ -90,7 +90,7 @@ const Community = () => {
   const dispatch = useDispatch();
   const { user } = useAuth();
   const { socket, isConnected } = useWebSocket();
-  const { profile } = useSelector(state => state.user);
+  const { profile } = useSelector(state => state.user || {});
   
   const [activeTab, setActiveTab] = useState('feed');
   const [isLoading, setIsLoading] = useState(false);
@@ -113,7 +113,7 @@ const Community = () => {
   const [pendingRequests, setPendingRequests] = useState([]);
   const [suggestedFriends, setSuggestedFriends] = useState([]);
   
-  // Notifications state
+  // Notifications state - Initialize as empty array
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
   
@@ -136,7 +136,7 @@ const Community = () => {
 
     socket.on('new_post', (data) => {
       setPosts(prev => [data, ...prev]);
-      toast.info(`New post from ${data.author.displayName}`);
+      toast.info(`New post from ${data.author?.displayName || 'Someone'}`);
     });
 
     socket.on('new_comment', (data) => {
@@ -149,7 +149,7 @@ const Community = () => {
     socket.on('new_like', (data) => {
       setPosts(prev => prev.map(post => 
         post.id === data.postId 
-          ? { ...post, likes: post.likes + 1, liked: true }
+          ? { ...post, likes: (post.likes || 0) + 1, liked: true }
           : post
       ));
     });
@@ -157,18 +157,18 @@ const Community = () => {
     socket.on('new_notification', (data) => {
       setNotifications(prev => [data, ...prev]);
       setUnreadCount(prev => prev + 1);
-      toast.info(data.message);
+      toast.info(data.message || 'New notification');
     });
 
     socket.on('friend_request', (data) => {
       setFriendRequests(prev => [...prev, data]);
-      toast.info(`${data.from.displayName} sent you a friend request`);
+      toast.info(`${data.from?.displayName || 'Someone'} sent you a friend request`);
     });
 
     socket.on('friend_request_accepted', (data) => {
       setPendingRequests(prev => prev.filter(r => r.id !== data.requestId));
       setFriends(prev => [...prev, data.friend]);
-      toast.success(`${data.friend.displayName} accepted your friend request!`);
+      toast.success(`${data.friend?.displayName || 'Someone'} accepted your friend request!`);
     });
 
     return () => {
@@ -187,32 +187,51 @@ const Community = () => {
       // Fetch posts
       const postsResponse = await fetch('/api/community/posts');
       const postsData = await postsResponse.json();
-      setPosts(postsData);
+      setPosts(Array.isArray(postsData) ? postsData : postsData.posts || []);
 
       // Fetch friends
       const friendsResponse = await fetch('/api/community/friends');
       const friendsData = await friendsResponse.json();
-      setFriends(friendsData);
+      setFriends(Array.isArray(friendsData) ? friendsData : []);
 
       // Fetch friend requests
       const requestsResponse = await fetch('/api/community/friend-requests');
       const requestsData = await requestsResponse.json();
-      setFriendRequests(requestsData.incoming);
-      setPendingRequests(requestsData.outgoing);
+      setFriendRequests(Array.isArray(requestsData?.incoming) ? requestsData.incoming : []);
+      setPendingRequests(Array.isArray(requestsData?.outgoing) ? requestsData.outgoing : []);
 
       // Fetch suggested friends
       const suggestedResponse = await fetch('/api/community/suggested-friends');
       const suggestedData = await suggestedResponse.json();
-      setSuggestedFriends(suggestedData);
+      setSuggestedFriends(Array.isArray(suggestedData) ? suggestedData : []);
 
-      // Fetch notifications
+      // Fetch notifications - FIX: Ensure we're getting an array
       const notificationsResponse = await fetch('/api/community/notifications');
       const notificationsData = await notificationsResponse.json();
-      setNotifications(notificationsData);
-      setUnreadCount(notificationsData.filter(n => !n.read).length);
+      
+      // SAFETY CHECK: Ensure notificationsData is an array
+      let notificationsArray = [];
+      if (Array.isArray(notificationsData)) {
+        notificationsArray = notificationsData;
+      } else if (notificationsData?.notifications && Array.isArray(notificationsData.notifications)) {
+        notificationsArray = notificationsData.notifications;
+      } else {
+        notificationsArray = [];
+        console.warn('Notifications data is not an array:', notificationsData);
+      }
+      
+      setNotifications(notificationsArray);
+      setUnreadCount(notificationsArray.filter(n => !n.read).length);
     } catch (error) {
       console.error('Error fetching community data:', error);
       toast.error('Failed to load community data');
+      // Set empty arrays on error
+      setNotifications([]);
+      setPosts([]);
+      setFriends([]);
+      setFriendRequests([]);
+      setPendingRequests([]);
+      setSuggestedFriends([]);
     } finally {
       setIsLoading(false);
     }
@@ -251,7 +270,7 @@ const Community = () => {
       await fetch(`/api/community/posts/${postId}/like`, { method: 'POST' });
       setPosts(prev => prev.map(post =>
         post.id === postId
-          ? { ...post, likes: post.likes + 1, liked: true }
+          ? { ...post, likes: (post.likes || 0) + 1, liked: true }
           : post
       ));
     } catch (error) {
@@ -291,21 +310,21 @@ const Community = () => {
       });
 
       if (action === 'accept') {
-        setFriendRequests(prev => prev.filter(r => r.from.id !== userId));
-        const friend = friendRequests.find(r => r.from.id === userId);
-        if (friend) {
+        setFriendRequests(prev => prev.filter(r => r.from?.id !== userId));
+        const friend = friendRequests.find(r => r.from?.id === userId);
+        if (friend?.from) {
           setFriends(prev => [...prev, friend.from]);
         }
         toast.success('Friend request accepted!');
       } else if (action === 'reject') {
-        setFriendRequests(prev => prev.filter(r => r.from.id !== userId));
+        setFriendRequests(prev => prev.filter(r => r.from?.id !== userId));
         toast.info('Friend request rejected');
       } else if (action === 'send') {
         setPendingRequests(prev => [...prev, { to: { id: userId } }]);
         setSuggestedFriends(prev => prev.filter(f => f.id !== userId));
         toast.success('Friend request sent!');
       } else if (action === 'cancel') {
-        setPendingRequests(prev => prev.filter(r => r.to.id !== userId));
+        setPendingRequests(prev => prev.filter(r => r.to?.id !== userId));
         toast.info('Friend request cancelled');
       }
     } catch (error) {
@@ -331,7 +350,8 @@ const Community = () => {
           ? { ...post, bookmarked: !post.bookmarked }
           : post
       ));
-      toast.success(post.bookmarked ? 'Bookmark removed' : 'Bookmarked!');
+      const post = posts.find(p => p.id === postId);
+      toast.success(post?.bookmarked ? 'Bookmark removed' : 'Bookmarked!');
     } catch (error) {
       console.error('Error bookmarking post:', error);
     }
@@ -543,9 +563,13 @@ const FeedTab = ({
   const [searchTerm, setSearchTerm] = useState('');
   const [filter, setFilter] = useState('all');
 
-  const filteredPosts = posts.filter(post => {
-    const matchesSearch = post.content.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          post.author.displayName.toLowerCase().includes(searchTerm.toLowerCase());
+  // Ensure posts is an array
+  const postsArray = Array.isArray(posts) ? posts : [];
+
+  const filteredPosts = postsArray.filter(post => {
+    if (!post) return false;
+    const matchesSearch = (post.content || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                          (post.author?.displayName || '').toLowerCase().includes(searchTerm.toLowerCase());
     const matchesFilter = filter === 'all' || post.privacy === filter;
     return matchesSearch && matchesFilter;
   });
@@ -611,12 +635,14 @@ const FeedTab = ({
         </div>
       ) : (
         filteredPosts.map((post, index) => {
+          if (!post) return null;
+          
           const PrivacyIcon = getPrivacyIcon(post.privacy);
           const postComments = comments[post.id] || [];
           
           return (
             <motion.div
-              key={post.id}
+              key={post.id || index}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: index * 0.05 }}
@@ -627,13 +653,15 @@ const FeedTab = ({
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-full bg-gradient-to-r from-primary-500 to-secondary-500 flex items-center justify-center">
                     <span className="text-sm font-bold text-white">
-                      {post.author.displayName?.[0] || 'U'}
+                      {post.author?.displayName?.[0] || 'U'}
                     </span>
                   </div>
                   <div>
-                    <p className="text-sm font-medium text-white">{post.author.displayName}</p>
+                    <p className="text-sm font-medium text-white">
+                      {post.author?.displayName || 'Unknown User'}
+                    </p>
                     <div className="flex items-center gap-2 text-xs text-gray-400">
-                      <span>{new Date(post.createdAt).toLocaleDateString()}</span>
+                      <span>{post.createdAt ? new Date(post.createdAt).toLocaleDateString() : 'Recently'}</span>
                       <span>•</span>
                       <span className="flex items-center gap-0.5">
                         <PrivacyIcon className="w-3 h-3" />
@@ -652,7 +680,7 @@ const FeedTab = ({
                 className="mt-3 cursor-pointer"
                 onClick={() => onPostClick(post)}
               >
-                <p className="text-gray-300 whitespace-pre-wrap">{post.content}</p>
+                <p className="text-gray-300 whitespace-pre-wrap">{post.content || ''}</p>
                 {post.images && post.images.length > 0 && (
                   <div className="mt-3 grid grid-cols-2 gap-2">
                     {post.images.map((image, i) => (
@@ -673,7 +701,7 @@ const FeedTab = ({
                   }`}
                 >
                   <Heart className={`w-4 h-4 ${post.liked ? 'fill-red-400' : ''}`} />
-                  <span>{post.likes}</span>
+                  <span>{post.likes || 0}</span>
                 </button>
                 <button
                   onClick={() => setCommentingPostId(commentingPostId === post.id ? null : post.id)}
@@ -732,10 +760,12 @@ const FeedTab = ({
                     <div className="mt-3 space-y-2 max-h-48 overflow-y-auto">
                       {postComments.slice(0, 3).map((comment, i) => (
                         <div key={i} className="flex items-start gap-2 text-sm">
-                          <span className="font-medium text-white">{comment.author.displayName}</span>
-                          <span className="text-gray-300">{comment.content}</span>
+                          <span className="font-medium text-white">
+                            {comment.author?.displayName || 'Unknown'}
+                          </span>
+                          <span className="text-gray-300">{comment.content || ''}</span>
                           <span className="text-xs text-gray-400 ml-auto">
-                            {new Date(comment.createdAt).toLocaleDateString()}
+                            {comment.createdAt ? new Date(comment.createdAt).toLocaleDateString() : ''}
                           </span>
                         </div>
                       ))}
@@ -762,41 +792,44 @@ const FeedTab = ({
 // Friends Tab
 const FriendsTab = ({ friends, friendRequests, pendingRequests, onAccept, onReject, onCancel }) => {
   const [searchTerm, setSearchTerm] = useState('');
-  const [filter, setFilter] = useState('all');
 
-  const filteredFriends = friends.filter(friend =>
-    friend.displayName.toLowerCase().includes(searchTerm.toLowerCase())
+  const friendsArray = Array.isArray(friends) ? friends : [];
+  const friendRequestsArray = Array.isArray(friendRequests) ? friendRequests : [];
+  const pendingRequestsArray = Array.isArray(pendingRequests) ? pendingRequests : [];
+
+  const filteredFriends = friendsArray.filter(friend =>
+    (friend?.displayName || '').toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   return (
     <div className="space-y-6">
       {/* Friend Requests */}
-      {friendRequests.length > 0 && (
+      {friendRequestsArray.length > 0 && (
         <div className="glass-effect rounded-xl p-4 border border-white/20">
           <h3 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
             <UserPlus className="w-4 h-4 text-primary-400" />
-            Friend Requests ({friendRequests.length})
+            Friend Requests ({friendRequestsArray.length})
           </h3>
           <div className="space-y-2">
-            {friendRequests.map((request) => (
+            {friendRequestsArray.map((request) => (
               <div key={request.id} className="flex items-center justify-between p-2 bg-white/5 rounded-lg">
                 <div className="flex items-center gap-3">
                   <div className="w-8 h-8 rounded-full bg-gradient-to-r from-primary-500 to-secondary-500 flex items-center justify-center">
                     <span className="text-xs font-bold text-white">
-                      {request.from.displayName?.[0] || 'U'}
+                      {request.from?.displayName?.[0] || 'U'}
                     </span>
                   </div>
-                  <span className="text-sm text-white">{request.from.displayName}</span>
+                  <span className="text-sm text-white">{request.from?.displayName || 'Unknown User'}</span>
                 </div>
                 <div className="flex gap-2">
                   <button
-                    onClick={() => onAccept(request.from.id)}
+                    onClick={() => onAccept(request.from?.id)}
                     className="p-1.5 bg-green-500/20 text-green-400 rounded-lg hover:bg-green-500/30 transition"
                   >
                     <UserCheck className="w-4 h-4" />
                   </button>
                   <button
-                    onClick={() => onReject(request.from.id)}
+                    onClick={() => onReject(request.from?.id)}
                     className="p-1.5 bg-red-500/20 text-red-400 rounded-lg hover:bg-red-500/30 transition"
                   >
                     <UserX className="w-4 h-4" />
@@ -813,7 +846,7 @@ const FriendsTab = ({ friends, friendRequests, pendingRequests, onAccept, onReje
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-4">
           <h3 className="text-sm font-semibold text-white flex items-center gap-2">
             <Users className="w-4 h-4 text-primary-400" />
-            Friends ({friends.length})
+            Friends ({friendsArray.length})
           </h3>
           <Input
             icon={Search}
@@ -840,7 +873,7 @@ const FriendsTab = ({ friends, friendRequests, pendingRequests, onAccept, onReje
                   </span>
                 </div>
                 <div className="flex-1">
-                  <p className="text-sm font-medium text-white">{friend.displayName}</p>
+                  <p className="text-sm font-medium text-white">{friend.displayName || 'Unknown User'}</p>
                   <p className="text-xs text-gray-400">{friend.careerPath || 'General'}</p>
                 </div>
                 <button className="p-1.5 text-gray-400 hover:text-white transition">
@@ -853,27 +886,27 @@ const FriendsTab = ({ friends, friendRequests, pendingRequests, onAccept, onReje
       </div>
 
       {/* Pending Requests */}
-      {pendingRequests.length > 0 && (
+      {pendingRequestsArray.length > 0 && (
         <div className="glass-effect rounded-xl p-4 border border-white/20">
           <h3 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
             <Clock className="w-4 h-4 text-yellow-400" />
             Pending Requests
           </h3>
           <div className="space-y-2">
-            {pendingRequests.map((request) => (
+            {pendingRequestsArray.map((request) => (
               <div key={request.id} className="flex items-center justify-between p-2 bg-white/5 rounded-lg">
                 <div className="flex items-center gap-3">
                   <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center">
                     <span className="text-xs font-bold text-gray-400">
-                      {request.to.displayName?.[0] || 'U'}
+                      {request.to?.displayName?.[0] || 'U'}
                     </span>
                   </div>
-                  <span className="text-sm text-gray-400">{request.to.displayName}</span>
+                  <span className="text-sm text-gray-400">{request.to?.displayName || 'Unknown User'}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="text-xs text-yellow-400">Pending</span>
                   <button
-                    onClick={() => onCancel(request.to.id)}
+                    onClick={() => onCancel(request.to?.id)}
                     className="p-1.5 text-gray-400 hover:text-red-400 transition"
                   >
                     <X className="w-4 h-4" />
@@ -890,6 +923,9 @@ const FriendsTab = ({ friends, friendRequests, pendingRequests, onAccept, onReje
 
 // Notifications Tab
 const NotificationsTab = ({ notifications, onMarkRead }) => {
+  // Ensure notifications is an array
+  const notificationsArray = Array.isArray(notifications) ? notifications : [];
+
   const getNotificationIcon = (type) => {
     const icons = {
       like: Heart,
@@ -920,7 +956,7 @@ const NotificationsTab = ({ notifications, onMarkRead }) => {
     <div className="glass-effect rounded-xl border border-white/20 overflow-hidden">
       <div className="p-4 border-b border-white/10 flex items-center justify-between">
         <h3 className="text-sm font-semibold text-white">Notifications</h3>
-        {notifications.some(n => !n.read) && (
+        {notificationsArray.some(n => !n.read) && (
           <button
             onClick={onMarkRead}
             className="text-xs text-primary-400 hover:text-primary-300 transition"
@@ -931,14 +967,14 @@ const NotificationsTab = ({ notifications, onMarkRead }) => {
       </div>
 
       <div className="max-h-[600px] overflow-y-auto">
-        {notifications.length === 0 ? (
+        {notificationsArray.length === 0 ? (
           <div className="p-8 text-center text-gray-400">
             <Bell className="w-12 h-12 mx-auto mb-3 text-gray-500" />
             <p>No notifications</p>
             <p className="text-sm">You're all caught up!</p>
           </div>
         ) : (
-          notifications.map((notification, index) => {
+          notificationsArray.map((notification, index) => {
             const Icon = getNotificationIcon(notification.type);
             return (
               <motion.div
@@ -955,10 +991,9 @@ const NotificationsTab = ({ notifications, onMarkRead }) => {
                   <Icon className={`w-4 h-4 ${getNotificationColor(notification.type)}`} />
                 </div>
                 <div className="flex-1">
-                  <p className="text-sm text-gray-300">{notification.message}</p>
+                  <p className="text-sm text-gray-300">{notification.message || 'New notification'}</p>
                   <p className="text-xs text-gray-400 mt-0.5">
-                    {new Date(notification.createdAt).toLocaleDateString()} at{' '}
-                    {new Date(notification.createdAt).toLocaleTimeString()}
+                    {notification.createdAt ? new Date(notification.createdAt).toLocaleDateString() : 'Recently'}
                   </p>
                 </div>
                 {!notification.read && (
@@ -977,8 +1012,10 @@ const NotificationsTab = ({ notifications, onMarkRead }) => {
 const SuggestedTab = ({ suggestedFriends, onSendRequest }) => {
   const [searchTerm, setSearchTerm] = useState('');
 
-  const filteredSuggestions = suggestedFriends.filter(friend =>
-    friend.displayName.toLowerCase().includes(searchTerm.toLowerCase())
+  const suggestedArray = Array.isArray(suggestedFriends) ? suggestedFriends : [];
+
+  const filteredSuggestions = suggestedArray.filter(friend =>
+    (friend?.displayName || '').toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   return (
@@ -1020,10 +1057,10 @@ const SuggestedTab = ({ suggestedFriends, onSendRequest }) => {
                   {friend.displayName?.[0] || 'U'}
                 </span>
               </div>
-              <p className="text-sm font-medium text-white">{friend.displayName}</p>
+              <p className="text-sm font-medium text-white">{friend.displayName || 'Unknown User'}</p>
               <p className="text-xs text-gray-400">{friend.careerPath || 'General'}</p>
               <div className="flex items-center justify-center gap-2 mt-2 text-xs text-gray-400">
-                <span>{friend.friends || 0} mutual friends</span>
+                <span>{friend.mutualFriends || 0} mutual friends</span>
               </div>
               <Button
                 variant="gradient"
@@ -1167,7 +1204,7 @@ const CreatePostModal = ({
   );
 };
 
-// Post Detail Modal
+// Post Detail Modal (simplified version)
 const PostDetailModal = ({
   post,
   comments,
@@ -1179,6 +1216,8 @@ const PostDetailModal = ({
   onReport,
 }) => {
   const [newComment, setNewComment] = useState('');
+
+  if (!post) return null;
 
   const handleComment = () => {
     if (!newComment.trim()) return;
@@ -1206,14 +1245,15 @@ const PostDetailModal = ({
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-full bg-gradient-to-r from-primary-500 to-secondary-500 flex items-center justify-center">
                 <span className="text-sm font-bold text-white">
-                  {post.author.displayName?.[0] || 'U'}
+                  {post.author?.displayName?.[0] || 'U'}
                 </span>
               </div>
               <div>
-                <p className="text-sm font-medium text-white">{post.author.displayName}</p>
+                <p className="text-sm font-medium text-white">
+                  {post.author?.displayName || 'Unknown User'}
+                </p>
                 <p className="text-xs text-gray-400">
-                  {new Date(post.createdAt).toLocaleDateString()} at{' '}
-                  {new Date(post.createdAt).toLocaleTimeString()}
+                  {post.createdAt ? new Date(post.createdAt).toLocaleDateString() : 'Recently'}
                 </p>
               </div>
             </div>
@@ -1224,7 +1264,7 @@ const PostDetailModal = ({
 
           {/* Post Content */}
           <div className="mb-4">
-            <p className="text-gray-300 whitespace-pre-wrap">{post.content}</p>
+            <p className="text-gray-300 whitespace-pre-wrap">{post.content || ''}</p>
             {post.images && post.images.length > 0 && (
               <div className="mt-3 grid grid-cols-2 gap-2">
                 {post.images.map((image, i) => (
@@ -1236,7 +1276,7 @@ const PostDetailModal = ({
             )}
           </div>
 
-          {/* Post Actions */}
+          {/* Actions */}
           <div className="flex items-center gap-6 pb-4 border-b border-white/10">
             <button
               onClick={() => onLike(post.id)}
@@ -1245,7 +1285,7 @@ const PostDetailModal = ({
               }`}
             >
               <Heart className={`w-4 h-4 ${post.liked ? 'fill-red-400' : ''}`} />
-              <span>{post.likes}</span>
+              <span>{post.likes || 0}</span>
             </button>
             <button
               onClick={() => onShare(post.id)}
@@ -1270,13 +1310,12 @@ const PostDetailModal = ({
             </button>
           </div>
 
-          {/* Comments Section */}
+          {/* Comments */}
           <div className="mt-4">
             <h4 className="text-sm font-semibold text-white mb-3">
-              Comments ({comments.length})
+              Comments ({comments?.length || 0})
             </h4>
 
-            {/* Comment Input */}
             <div className="flex gap-2 mb-4">
               <Input
                 placeholder="Write a comment..."
@@ -1294,25 +1333,26 @@ const PostDetailModal = ({
               </Button>
             </div>
 
-            {/* Comments List */}
             <div className="space-y-3 max-h-60 overflow-y-auto">
-              {comments.length === 0 ? (
+              {!comments || comments.length === 0 ? (
                 <p className="text-sm text-gray-400 text-center py-4">No comments yet</p>
               ) : (
                 comments.map((comment, index) => (
                   <div key={index} className="flex items-start gap-2 p-2 bg-white/5 rounded-lg">
                     <div className="w-6 h-6 rounded-full bg-gradient-to-r from-primary-500 to-secondary-500 flex items-center justify-center flex-shrink-0">
                       <span className="text-xs font-bold text-white">
-                        {comment.author.displayName?.[0] || 'U'}
+                        {comment.author?.displayName?.[0] || 'U'}
                       </span>
                     </div>
                     <div className="flex-1">
                       <p className="text-sm">
-                        <span className="font-medium text-white">{comment.author.displayName}</span>
-                        <span className="text-gray-300 ml-1">{comment.content}</span>
+                        <span className="font-medium text-white">
+                          {comment.author?.displayName || 'Unknown'}
+                        </span>
+                        <span className="text-gray-300 ml-1">{comment.content || ''}</span>
                       </p>
                       <p className="text-xs text-gray-400 mt-0.5">
-                        {new Date(comment.createdAt).toLocaleDateString()}
+                        {comment.createdAt ? new Date(comment.createdAt).toLocaleDateString() : ''}
                       </p>
                     </div>
                   </div>

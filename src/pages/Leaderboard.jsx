@@ -46,8 +46,7 @@ import {
   Flag,
   MoreVertical,
   BarChart3,
-  TrendingDown,
-  Award as AwardIcon,
+  X,
 } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { useWebSocket } from '../context/WebSocketContext';
@@ -59,7 +58,7 @@ const Leaderboard = () => {
   const dispatch = useDispatch();
   const { user } = useAuth();
   const { socket, isConnected } = useWebSocket();
-  const { profile } = useSelector(state => state.user);
+  const { profile } = useSelector(state => state.user || {});
   
   const [leaderboardData, setLeaderboardData] = useState([]);
   const [userRank, setUserRank] = useState(null);
@@ -72,7 +71,7 @@ const Leaderboard = () => {
   const [totalPages, setTotalPages] = useState(1);
   const [selectedUser, setSelectedUser] = useState(null);
   const [showUserModal, setShowUserModal] = useState(false);
-  const [viewMode, setViewMode] = useState('grid'); // 'grid' or 'list'
+  const [viewMode, setViewMode] = useState('grid');
   const [showFilters, setShowFilters] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [animationKey, setAnimationKey] = useState(0);
@@ -85,7 +84,7 @@ const Leaderboard = () => {
     fetchLeaderboard();
   }, [filter, timeframe, sortBy, currentPage]);
 
-  // WebSocket connection for real-time updates
+  // WebSocket connection
   useEffect(() => {
     if (!socket || !isConnected) return;
 
@@ -112,12 +111,21 @@ const Leaderboard = () => {
         `/api/leaderboard?page=${currentPage}&limit=${itemsPerPage}&filter=${filter}&timeframe=${timeframe}&sort=${sortBy}&search=${searchTerm}`
       );
       const data = await response.json();
-      setLeaderboardData(data.users);
-      setUserRank(data.userRank);
-      setTotalPages(data.totalPages);
+      
+      // Safety check - ensure data has users array
+      if (data && data.users && Array.isArray(data.users)) {
+        setLeaderboardData(data.users);
+        setUserRank(data.userRank || null);
+        setTotalPages(data.totalPages || 1);
+      } else {
+        setLeaderboardData([]);
+        setUserRank(null);
+        setTotalPages(1);
+      }
     } catch (error) {
       console.error('Error fetching leaderboard:', error);
       toast.error('Failed to load leaderboard');
+      setLeaderboardData([]);
     } finally {
       setIsLoading(false);
     }
@@ -125,6 +133,7 @@ const Leaderboard = () => {
 
   const handleLeaderboardUpdate = (data) => {
     setLeaderboardData(prev => {
+      if (!prev || !Array.isArray(prev)) return [];
       const updated = [...prev];
       const index = updated.findIndex(u => u.id === data.userId);
       if (index !== -1) {
@@ -154,6 +163,7 @@ const Leaderboard = () => {
   };
 
   const getRankIcon = (rank) => {
+    if (!rank) return Award;
     const icons = {
       1: Crown,
       2: Medal,
@@ -163,6 +173,7 @@ const Leaderboard = () => {
   };
 
   const getRankColor = (rank) => {
+    if (!rank) return 'text-primary-400';
     const colors = {
       1: 'text-yellow-400',
       2: 'text-gray-300',
@@ -172,22 +183,13 @@ const Leaderboard = () => {
   };
 
   const getRankBgColor = (rank) => {
+    if (!rank) return 'bg-primary-500/10';
     const colors = {
       1: 'bg-yellow-400/20',
       2: 'bg-gray-300/20',
       3: 'bg-amber-600/20',
     };
     return colors[rank] || 'bg-primary-500/10';
-  };
-
-  const getTimeframeLabel = () => {
-    const labels = {
-      daily: 'Today',
-      weekly: 'This Week',
-      monthly: 'This Month',
-      allTime: 'All Time',
-    };
-    return labels[timeframe] || timeframe;
   };
 
   const getFilterIcon = (filterType) => {
@@ -203,26 +205,13 @@ const Leaderboard = () => {
     return icons[filterType] || Users;
   };
 
-  const getFilterLabel = (filterType) => {
-    const labels = {
-      all: 'All Players',
-      developer: 'Developers',
-      designer: 'Designers',
-      business: 'Business',
-      student: 'Students',
-      fitness: 'Fitness',
-      creator: 'Creators',
-    };
-    return labels[filterType] || filterType;
-  };
-
   const formatValue = (value) => {
     if (typeof value === 'number') {
       if (value >= 1000000) return `${(value / 1000000).toFixed(1)}M`;
       if (value >= 1000) return `${(value / 1000).toFixed(1)}K`;
       return value.toString();
     }
-    return value;
+    return value || '0';
   };
 
   const getRankChangeIcon = (change) => {
@@ -261,7 +250,10 @@ const Leaderboard = () => {
     { value: 'streak', label: 'Streak' },
   ];
 
-  if (isLoading && leaderboardData.length === 0) {
+  // Check if data exists before rendering
+  const hasData = leaderboardData && Array.isArray(leaderboardData) && leaderboardData.length > 0;
+
+  if (isLoading && !hasData) {
     return <LoadingSkeleton />;
   }
 
@@ -273,7 +265,7 @@ const Leaderboard = () => {
           <h1 className="text-3xl font-bold gradient-text">Leaderboard</h1>
           <p className="text-gray-400">
             See where you rank among other players
-            {timeframe !== 'allTime' && ` • ${getTimeframeLabel()}`}
+            {timeframe !== 'allTime' && ` • ${getTimeframeLabel(timeframe)}`}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -308,9 +300,9 @@ const Leaderboard = () => {
             <div className="flex items-center gap-4">
               <div className="relative">
                 <div className={`w-12 h-12 rounded-full ${getRankBgColor(userRank.rank)} flex items-center justify-center`}>
-                  <span className="text-xl font-bold text-white">{userRank.rank}</span>
+                  <span className="text-xl font-bold text-white">{userRank.rank || '?'}</span>
                 </div>
-                {userRank.change !== 0 && (
+                {userRank.change && userRank.change !== 0 && (
                   <div className={`absolute -bottom-1 -right-1 px-1.5 py-0.5 rounded-full text-xs font-bold ${getRankChangeColor(userRank.change)} bg-dark-800 border border-white/10`}>
                     {userRank.change > 0 ? '+' : ''}{userRank.change}
                   </div>
@@ -319,7 +311,7 @@ const Leaderboard = () => {
               <div>
                 <p className="text-sm font-medium text-white">Your Rank</p>
                 <p className="text-xs text-gray-400">
-                  {formatValue(userRank.xp)} XP • Level {userRank.level} • {userRank.streak} day streak
+                  {formatValue(userRank.xp)} XP • Level {userRank.level || 1} • {userRank.streak || 0} day streak
                 </p>
               </div>
             </div>
@@ -340,7 +332,7 @@ const Leaderboard = () => {
                 <div className="w-full bg-white/10 rounded-full h-1.5">
                   <div
                     className="bg-gradient-to-r from-primary-500 to-secondary-500 h-1.5 rounded-full transition-all"
-                    style={{ width: `${userRank.progress || 0}%` }}
+                    style={{ width: `${Math.min(userRank.progress || 0, 100)}%` }}
                   />
                 </div>
               </div>
@@ -464,7 +456,13 @@ const Leaderboard = () => {
 
       {/* Leaderboard Content */}
       <AnimatePresence mode="wait">
-        {viewMode === 'grid' ? (
+        {!hasData ? (
+          <div className="glass-effect rounded-xl p-12 text-center border border-white/20">
+            <Users className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+            <h3 className="text-lg font-semibold text-white">No players found</h3>
+            <p className="text-gray-400">Try adjusting your filters or search terms</p>
+          </div>
+        ) : viewMode === 'grid' ? (
           <GridLeaderboard
             key="grid"
             data={leaderboardData}
@@ -535,6 +533,17 @@ const Leaderboard = () => {
   );
 };
 
+// Helper function
+const getTimeframeLabel = (timeframe) => {
+  const labels = {
+    daily: 'Today',
+    weekly: 'This Week',
+    monthly: 'This Month',
+    allTime: 'All Time',
+  };
+  return labels[timeframe] || timeframe;
+};
+
 // Grid Leaderboard View
 const GridLeaderboard = ({
   data,
@@ -546,12 +555,13 @@ const GridLeaderboard = ({
   getRankChangeIcon,
   getRankChangeColor,
 }) => {
-  if (data.length === 0) {
+  // Safety check - ensure data exists and is an array
+  if (!data || !Array.isArray(data) || data.length === 0) {
     return (
       <div className="glass-effect rounded-xl p-12 text-center border border-white/20">
         <Users className="w-12 h-12 text-gray-400 mx-auto mb-4" />
         <h3 className="text-lg font-semibold text-white">No players found</h3>
-        <p className="text-gray-400">Try adjusting your filters or search terms</p>
+        <p className="text-gray-400">Try adjusting your filters</p>
       </div>
     );
   }
@@ -559,12 +569,14 @@ const GridLeaderboard = ({
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
       {data.map((user, index) => {
+        if (!user) return null;
+        
         const RankIcon = getRankIcon(user.rank);
-        const isCurrentUser = user.isCurrentUser;
+        const isCurrentUser = user.isCurrentUser || false;
         
         return (
           <motion.div
-            key={user.id}
+            key={user.id || index}
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ delay: index * 0.05 }}
@@ -581,7 +593,7 @@ const GridLeaderboard = ({
                   <div className={`w-12 h-12 rounded-full ${getRankBgColor(user.rank)} flex items-center justify-center`}>
                     <RankIcon className={`w-6 h-6 ${getRankColor(user.rank)}`} />
                   </div>
-                  {user.rank <= 3 && (
+                  {user.rank && user.rank <= 3 && (
                     <div className="absolute -top-1 -right-1 text-xs font-bold text-white bg-primary-500 rounded-full w-5 h-5 flex items-center justify-center">
                       {user.rank}
                     </div>
@@ -589,16 +601,16 @@ const GridLeaderboard = ({
                 </div>
                 <div>
                   <p className="text-sm font-semibold text-white flex items-center gap-1">
-                    {user.displayName}
+                    {user.displayName || 'Unknown Player'}
                     {isCurrentUser && (
                       <span className="text-xs text-primary-400">(You)</span>
                     )}
                   </p>
                   <div className="flex items-center gap-2 text-xs text-gray-400">
-                    <span>Rank #{user.rank}</span>
+                    <span>Rank #{user.rank || '?'}</span>
                     <span>•</span>
-                    <span>Level {user.level}</span>
-                    {user.rankChange !== 0 && (
+                    <span>Level {user.level || 1}</span>
+                    {user.rankChange && user.rankChange !== 0 && (
                       <span className={`flex items-center gap-0.5 ${getRankChangeColor(user.rankChange)}`}>
                         {getRankChangeIcon(user.rankChange)}
                         {Math.abs(user.rankChange)}
@@ -662,6 +674,17 @@ const ListLeaderboard = ({
   getRankChangeIcon,
   getRankChangeColor,
 }) => {
+  // Safety check - ensure data exists and is an array
+  if (!data || !Array.isArray(data) || data.length === 0) {
+    return (
+      <div className="glass-effect rounded-xl p-12 text-center border border-white/20">
+        <Users className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+        <h3 className="text-lg font-semibold text-white">No players found</h3>
+        <p className="text-gray-400">Try adjusting your filters</p>
+      </div>
+    );
+  }
+
   return (
     <div className="glass-effect rounded-xl border border-white/20 overflow-hidden">
       <div className="overflow-x-auto">
@@ -679,12 +702,14 @@ const ListLeaderboard = ({
           </thead>
           <tbody>
             {data.map((user, index) => {
+              if (!user) return null;
+              
               const RankIcon = getRankIcon(user.rank);
-              const isCurrentUser = user.isCurrentUser;
+              const isCurrentUser = user.isCurrentUser || false;
               
               return (
                 <motion.tr
-                  key={user.id}
+                  key={user.id || index}
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: index * 0.03 }}
@@ -699,8 +724,8 @@ const ListLeaderboard = ({
                       <div className={`w-8 h-8 rounded-full ${getRankBgColor(user.rank)} flex items-center justify-center`}>
                         <RankIcon className={`w-4 h-4 ${getRankColor(user.rank)}`} />
                       </div>
-                      <span className="text-sm font-medium text-white">#{user.rank}</span>
-                      {user.rankChange !== 0 && (
+                      <span className="text-sm font-medium text-white">#{user.rank || '?'}</span>
+                      {user.rankChange && user.rankChange !== 0 && (
                         <span className={`flex items-center gap-0.5 text-xs ${getRankChangeColor(user.rankChange)}`}>
                           {getRankChangeIcon(user.rankChange)}
                           {Math.abs(user.rankChange)}
@@ -711,7 +736,7 @@ const ListLeaderboard = ({
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2">
                       <span className="text-sm font-medium text-white">
-                        {user.displayName}
+                        {user.displayName || 'Unknown Player'}
                       </span>
                       {isCurrentUser && (
                         <span className="text-xs text-primary-400">(You)</span>
@@ -723,7 +748,7 @@ const ListLeaderboard = ({
                     {formatValue(user.xp)}
                   </td>
                   <td className="px-4 py-3 text-sm font-medium text-white">
-                    {user.level}
+                    {user.level || 1}
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-1 text-sm font-medium text-white">
@@ -751,11 +776,13 @@ const ListLeaderboard = ({
 const UserDetailModal = ({ user, onClose }) => {
   const [activeTab, setActiveTab] = useState('stats');
 
+  if (!user) return null;
+
   const stats = [
-    { label: 'Total XP', value: user.xp, icon: Zap },
-    { label: 'Level', value: user.level, icon: TrendingUp },
-    { label: 'Rank', value: `#${user.rank}`, icon: Award },
-    { label: 'Streak', value: `${user.streak} days`, icon: Flame },
+    { label: 'Total XP', value: user.xp || 0, icon: Zap },
+    { label: 'Level', value: user.level || 1, icon: TrendingUp },
+    { label: 'Rank', value: `#${user.rank || '?'}`, icon: Award },
+    { label: 'Streak', value: `${user.streak || 0} days`, icon: Flame },
     { label: 'Missions', value: user.missionsCompleted || 0, icon: Target },
     { label: 'Achievements', value: user.achievements || 0, icon: Star },
   ];
@@ -785,11 +812,11 @@ const UserDetailModal = ({ user, onClose }) => {
                 </span>
               </div>
               <div>
-                <h3 className="text-xl font-bold text-white">{user.displayName}</h3>
+                <h3 className="text-xl font-bold text-white">{user.displayName || 'Unknown Player'}</h3>
                 <div className="flex items-center gap-2 text-sm text-gray-400">
-                  <span>Rank #{user.rank}</span>
+                  <span>Rank #{user.rank || '?'}</span>
                   <span>•</span>
-                  <span>Level {user.level}</span>
+                  <span>Level {user.level || 1}</span>
                   <span>•</span>
                   <span>{user.careerPath || 'General'}</span>
                 </div>
@@ -844,28 +871,32 @@ const UserDetailModal = ({ user, onClose }) => {
           <div>
             {activeTab === 'stats' && (
               <div className="space-y-3">
-                {Object.entries(user.personalityStats || {}).map(([key, value]) => (
-                  <div key={key}>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-gray-400 capitalize">{key}</span>
-                      <span className="text-white">{Math.round(value)}%</span>
+                {user.personalityStats && Object.keys(user.personalityStats).length > 0 ? (
+                  Object.entries(user.personalityStats).map(([key, value]) => (
+                    <div key={key}>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-gray-400 capitalize">{key}</span>
+                        <span className="text-white">{Math.round(value)}%</span>
+                      </div>
+                      <div className="w-full bg-white/10 rounded-full h-1.5">
+                        <div
+                          className="bg-gradient-to-r from-primary-500 to-secondary-500 h-1.5 rounded-full"
+                          style={{ width: `${Math.min(value, 100)}%` }}
+                        />
+                      </div>
                     </div>
-                    <div className="w-full bg-white/10 rounded-full h-1.5">
-                      <div
-                        className="bg-gradient-to-r from-primary-500 to-secondary-500 h-1.5 rounded-full"
-                        style={{ width: `${value}%` }}
-                      />
-                    </div>
-                  </div>
-                ))}
+                  ))
+                ) : (
+                  <p className="text-sm text-gray-400">No personality stats available</p>
+                )}
               </div>
             )}
             {activeTab === 'achievements' && (
               <div className="grid grid-cols-2 gap-2">
-                {user.achievementsList?.length > 0 ? (
+                {user.achievementsList && user.achievementsList.length > 0 ? (
                   user.achievementsList.map((achievement, index) => (
                     <div key={index} className="p-2 bg-white/5 rounded-lg flex items-center gap-2">
-                      <AwardIcon className="w-4 h-4 text-yellow-400" />
+                      <Award className="w-4 h-4 text-yellow-400" />
                       <span className="text-sm text-white">{achievement}</span>
                     </div>
                   ))
@@ -878,7 +909,7 @@ const UserDetailModal = ({ user, onClose }) => {
             )}
             {activeTab === 'activity' && (
               <div className="space-y-2">
-                {user.recentActivity?.length > 0 ? (
+                {user.recentActivity && user.recentActivity.length > 0 ? (
                   user.recentActivity.map((activity, index) => (
                     <div key={index} className="p-2 bg-white/5 rounded-lg flex items-center justify-between">
                       <span className="text-sm text-gray-300">{activity}</span>
@@ -910,7 +941,6 @@ const UserDetailModal = ({ user, onClose }) => {
               variant="outline"
               className="flex-1"
               onClick={() => {
-                // Follow user
                 toast.success(`Following ${user.displayName}`);
               }}
             >

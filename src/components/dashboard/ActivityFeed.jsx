@@ -25,10 +25,10 @@ import {
   Loader,
   Eye,
   EyeOff,
-  MoreVertical,
   Share2,
   Bookmark,
   Flag,
+  X
 } from 'lucide-react';
 import { formatDistanceToNow, format } from 'date-fns';
 import { useWebSocket } from '../../context/WebSocketContext';
@@ -37,7 +37,7 @@ import { toast } from 'react-toastify';
 const ActivityFeed = () => {
   const dispatch = useDispatch();
   const { socket, isConnected } = useWebSocket();
-  const { profile } = useSelector(state => state.user);
+  const { profile } = useSelector(state => state.user || {});
   
   const [activities, setActivities] = useState([]);
   const [filter, setFilter] = useState('all');
@@ -63,7 +63,6 @@ const ActivityFeed = () => {
   useEffect(() => {
     if (!socket || !isConnected) return;
 
-    // Listen for new activities
     socket.on('new_activity', (data) => {
       handleNewActivity(data);
     });
@@ -133,17 +132,24 @@ const ActivityFeed = () => {
       const response = await fetch(`/api/activities?page=${pageNum}&filter=${filter}&limit=20`);
       const data = await response.json();
       
-      if (pageNum === 1) {
-        setActivities(data.activities);
+      // Safety check - ensure data has activities array
+      if (data && data.activities && Array.isArray(data.activities)) {
+        if (pageNum === 1) {
+          setActivities(data.activities);
+        } else {
+          setActivities(prev => [...prev, ...data.activities]);
+        }
+        setHasMore(data.hasMore || false);
+        setPage(pageNum);
       } else {
-        setActivities(prev => [...prev, ...data.activities]);
+        // Handle case where activities is not an array
+        setActivities([]);
+        setHasMore(false);
       }
-      
-      setHasMore(data.hasMore);
-      setPage(pageNum);
     } catch (error) {
       console.error('Error fetching activities:', error);
       toast.error('Failed to load activities');
+      setActivities([]);
     } finally {
       setIsLoading(false);
     }
@@ -156,6 +162,8 @@ const ActivityFeed = () => {
   };
 
   const handleNewActivity = (data) => {
+    if (!data) return;
+    
     // Add to activities
     setActivities(prev => [data, ...prev]);
     
@@ -170,6 +178,8 @@ const ActivityFeed = () => {
   };
 
   const updateActivity = (data) => {
+    if (!data || !data.id) return;
+    
     setActivities(prev => 
       prev.map(activity => 
         activity.id === data.id ? { ...activity, ...data } : activity
@@ -178,12 +188,14 @@ const ActivityFeed = () => {
   };
 
   const addAchievementActivity = (data) => {
+    if (!data) return;
+    
     const newActivity = {
       id: `achievement-${Date.now()}`,
       type: 'achievement',
       icon: 'Award',
       title: 'Achievement Unlocked! 🏆',
-      content: `You unlocked "${data.achievement.name}"!`,
+      content: `You unlocked "${data.achievement?.name || 'an achievement'}"!`,
       timestamp: new Date().toISOString(),
       metadata: data,
       isNew: true,
@@ -192,12 +204,14 @@ const ActivityFeed = () => {
   };
 
   const addLevelUpActivity = (data) => {
+    if (!data) return;
+    
     const newActivity = {
       id: `levelup-${Date.now()}`,
       type: 'level_up',
       icon: 'TrendingUp',
       title: 'Level Up! 🎉',
-      content: `You reached Level ${data.newLevel}!`,
+      content: `You reached Level ${data.newLevel || 'a new level'}!`,
       timestamp: new Date().toISOString(),
       metadata: data,
       isNew: true,
@@ -206,12 +220,14 @@ const ActivityFeed = () => {
   };
 
   const addRankUpActivity = (data) => {
+    if (!data) return;
+    
     const newActivity = {
       id: `rankup-${Date.now()}`,
       type: 'rank_up',
       icon: 'Star',
       title: 'Rank Up! ⭐',
-      content: `You reached Rank ${data.newRank}!`,
+      content: `You reached Rank ${data.newRank || 'a new rank'}!`,
       timestamp: new Date().toISOString(),
       metadata: data,
       isNew: true,
@@ -232,23 +248,24 @@ const ActivityFeed = () => {
   };
 
   const handleShare = (activity) => {
-    // Share activity
+    if (!activity) return;
+    
     if (navigator.share) {
       navigator.share({
-        title: activity.title,
-        text: activity.content,
+        title: activity.title || 'Activity',
+        text: activity.content || '',
         url: window.location.href,
       }).catch(console.error);
     } else {
-      // Fallback - copy to clipboard
-      const text = `${activity.title}: ${activity.content}`;
+      const text = `${activity.title || 'Activity'}: ${activity.content || ''}`;
       navigator.clipboard.writeText(text);
       toast.success('Copied to clipboard!');
     }
   };
 
   const handleBookmark = (activityId) => {
-    // Toggle bookmark
+    if (!activityId) return;
+    
     setActivities(prev =>
       prev.map(activity =>
         activity.id === activityId
@@ -256,7 +273,8 @@ const ActivityFeed = () => {
           : activity
       )
     );
-    toast.success(activities.find(a => a.id === activityId)?.bookmarked ? 'Bookmark removed' : 'Bookmarked!');
+    const activity = activities.find(a => a.id === activityId);
+    toast.success(activity?.bookmarked ? 'Bookmark removed' : 'Bookmarked!');
   };
 
   const clearNewActivities = () => {
@@ -265,6 +283,8 @@ const ActivityFeed = () => {
   };
 
   const getActivityIcon = (type) => {
+    if (!type) return Activity;
+    
     const icons = {
       mission: Target,
       habit: CheckCircle,
@@ -282,6 +302,8 @@ const ActivityFeed = () => {
   };
 
   const getActivityColor = (type) => {
+    if (!type) return 'text-gray-400';
+    
     const colors = {
       mission: 'text-blue-400',
       habit: 'text-green-400',
@@ -299,6 +321,8 @@ const ActivityFeed = () => {
   };
 
   const getActivityBgColor = (type) => {
+    if (!type) return 'bg-white/5';
+    
     const colors = {
       mission: 'bg-blue-500/10',
       habit: 'bg-green-500/10',
@@ -323,6 +347,9 @@ const ActivityFeed = () => {
     { value: 'xp', label: 'XP Gains', icon: Zap },
     { value: 'social', label: 'Social', icon: Users },
   ];
+
+  // Safe check for activities length
+  const hasActivities = activities && Array.isArray(activities) && activities.length > 0;
 
   return (
     <div className="glass-effect rounded-xl border border-white/20 overflow-hidden">
@@ -407,12 +434,12 @@ const ActivityFeed = () => {
         ref={feedRef}
         className="max-h-[500px] overflow-y-auto"
       >
-        {isLoading && activities.length === 0 ? (
+        {isLoading && !hasActivities ? (
           <div className="p-8 text-center">
             <Loader className="w-8 h-8 text-primary-400 animate-spin mx-auto" />
             <p className="mt-2 text-sm text-gray-400">Loading activities...</p>
           </div>
-        ) : activities.length === 0 ? (
+        ) : !hasActivities ? (
           <div className="p-8 text-center">
             <Activity className="w-12 h-12 text-gray-400 mx-auto mb-3" />
             <h4 className="text-sm font-medium text-white">No activities yet</h4>
@@ -432,23 +459,23 @@ const ActivityFeed = () => {
             )}
 
             {activities.map((activity, index) => {
-              const Icon = getActivityIcon(activity.type);
+              const Icon = getActivityIcon(activity?.type);
               const isLast = index === activities.length - 1;
               
               return (
                 <div
-                  key={activity.id}
+                  key={activity?.id || index}
                   ref={isLast ? lastActivityRef : null}
                   className={`
                     group relative p-3 border-b border-white/5 hover:bg-white/5 transition cursor-pointer
-                    ${activity.isNew ? 'bg-primary-500/5' : ''}
+                    ${activity?.isNew ? 'bg-primary-500/5' : ''}
                   `}
                   onClick={() => handleActivityClick(activity)}
                 >
                   <div className="flex items-start gap-3">
                     {/* Activity Icon */}
-                    <div className={`p-2 rounded-lg ${getActivityBgColor(activity.type)} flex-shrink-0`}>
-                      <Icon className={`w-4 h-4 ${getActivityColor(activity.type)}`} />
+                    <div className={`p-2 rounded-lg ${getActivityBgColor(activity?.type)} flex-shrink-0`}>
+                      <Icon className={`w-4 h-4 ${getActivityColor(activity?.type)}`} />
                     </div>
 
                     {/* Activity Content */}
@@ -456,21 +483,21 @@ const ActivityFeed = () => {
                       <div className="flex items-start justify-between gap-2">
                         <div>
                           <p className="text-sm font-medium text-white">
-                            {activity.title}
+                            {activity?.title || 'Activity'}
                           </p>
                           <p className="text-sm text-gray-400 line-clamp-2">
-                            {activity.content}
+                            {activity?.content || ''}
                           </p>
                         </div>
                         <div className="flex items-center gap-1 flex-shrink-0">
                           <span className="text-xs text-gray-500 whitespace-nowrap">
-                            {formatDistanceToNow(new Date(activity.timestamp), { addSuffix: true })}
+                            {activity?.timestamp ? formatDistanceToNow(new Date(activity.timestamp), { addSuffix: true }) : 'Just now'}
                           </span>
                         </div>
                       </div>
 
                       {/* Activity Metadata */}
-                      {activity.metadata && (
+                      {activity?.metadata && (
                         <div className="mt-1 flex items-center gap-3">
                           {activity.metadata.xp && (
                             <span className="text-xs text-yellow-400 flex items-center gap-0.5">
@@ -499,11 +526,11 @@ const ActivityFeed = () => {
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              handleBookmark(activity.id);
+                              handleBookmark(activity?.id);
                             }}
                             className="p-1 rounded hover:bg-white/10 transition text-gray-400 hover:text-white"
                           >
-                            <Bookmark className={`w-3.5 h-3.5 ${activity.bookmarked ? 'fill-primary-400 text-primary-400' : ''}`} />
+                            <Bookmark className={`w-3.5 h-3.5 ${activity?.bookmarked ? 'fill-primary-400 text-primary-400' : ''}`} />
                           </button>
                           <button
                             onClick={(e) => {
@@ -517,7 +544,6 @@ const ActivityFeed = () => {
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              // Report activity
                               toast.info('Activity reported for review');
                             }}
                             className="p-1 rounded hover:bg-white/10 transition text-gray-400 hover:text-white"
@@ -532,13 +558,13 @@ const ActivityFeed = () => {
               );
             })}
 
-            {isLoading && activities.length > 0 && (
+            {isLoading && hasActivities && (
               <div className="p-4 text-center">
                 <Loader className="w-6 h-6 text-primary-400 animate-spin mx-auto" />
               </div>
             )}
 
-            {!hasMore && activities.length > 0 && (
+            {!hasMore && hasActivities && (
               <div className="p-4 text-center">
                 <p className="text-xs text-gray-400">No more activities to show</p>
               </div>
@@ -567,7 +593,7 @@ const ActivityFeed = () => {
 
 // Activity Detail Modal
 const ActivityDetailModal = ({ activity, onClose, onShare, onBookmark }) => {
-  const Icon = getActivityIcon(activity.type);
+  const Icon = getActivityIcon(activity?.type);
   
   return (
     <motion.div
@@ -588,13 +614,13 @@ const ActivityDetailModal = ({ activity, onClose, onShare, onBookmark }) => {
           {/* Header */}
           <div className="flex items-start justify-between mb-4">
             <div className="flex items-center gap-3">
-              <div className={`p-3 rounded-xl ${getActivityBgColor(activity.type)}`}>
-                <Icon className={`w-6 h-6 ${getActivityColor(activity.type)}`} />
+              <div className={`p-3 rounded-xl ${getActivityBgColor(activity?.type)}`}>
+                <Icon className={`w-6 h-6 ${getActivityColor(activity?.type)}`} />
               </div>
               <div>
-                <h3 className="text-lg font-bold text-white">{activity.title}</h3>
+                <h3 className="text-lg font-bold text-white">{activity?.title || 'Activity'}</h3>
                 <p className="text-sm text-gray-400">
-                  {format(new Date(activity.timestamp), 'PPP p')}
+                  {activity?.timestamp ? format(new Date(activity.timestamp), 'PPP p') : 'Just now'}
                 </p>
               </div>
             </div>
@@ -608,16 +634,16 @@ const ActivityDetailModal = ({ activity, onClose, onShare, onBookmark }) => {
 
           {/* Content */}
           <div className="space-y-4">
-            <p className="text-gray-300">{activity.content}</p>
+            <p className="text-gray-300">{activity?.content || ''}</p>
             
-            {activity.metadata && (
+            {activity?.metadata && (
               <div className="p-4 bg-white/5 rounded-lg">
                 <h4 className="text-sm font-semibold text-white mb-2">Details</h4>
                 <div className="grid grid-cols-2 gap-3">
                   {Object.entries(activity.metadata).map(([key, value]) => (
                     <div key={key} className="p-2 bg-white/5 rounded">
                       <p className="text-xs text-gray-400 capitalize">{key}</p>
-                      <p className="text-sm font-medium text-white">{value}</p>
+                      <p className="text-sm font-medium text-white">{String(value)}</p>
                     </div>
                   ))}
                 </div>
@@ -639,13 +665,13 @@ const ActivityDetailModal = ({ activity, onClose, onShare, onBookmark }) => {
             </button>
             <button
               onClick={() => {
-                onBookmark(activity.id);
+                onBookmark(activity?.id);
                 onClose();
               }}
               className="flex-1 px-4 py-2 bg-white/5 rounded-lg text-white hover:bg-white/10 transition flex items-center justify-center gap-2"
             >
               <Bookmark className="w-4 h-4" />
-              {activity.bookmarked ? 'Remove Bookmark' : 'Bookmark'}
+              {activity?.bookmarked ? 'Remove Bookmark' : 'Bookmark'}
             </button>
           </div>
         </div>
@@ -654,8 +680,10 @@ const ActivityDetailModal = ({ activity, onClose, onShare, onBookmark }) => {
   );
 };
 
-// Helper functions
+// Helper functions for modal
 const getActivityIcon = (type) => {
+  if (!type) return Activity;
+  
   const icons = {
     mission: Target,
     habit: CheckCircle,
@@ -673,6 +701,8 @@ const getActivityIcon = (type) => {
 };
 
 const getActivityColor = (type) => {
+  if (!type) return 'text-gray-400';
+  
   const colors = {
     mission: 'text-blue-400',
     habit: 'text-green-400',
@@ -690,6 +720,8 @@ const getActivityColor = (type) => {
 };
 
 const getActivityBgColor = (type) => {
+  if (!type) return 'bg-white/5';
+  
   const colors = {
     mission: 'bg-blue-500/10',
     habit: 'bg-green-500/10',
