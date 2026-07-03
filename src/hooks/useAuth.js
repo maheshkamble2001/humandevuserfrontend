@@ -37,7 +37,6 @@ export const useAuth = () => {
     } catch (error) {
       console.error('Error fetching user:', error);
       if (error.response?.status === 401) {
-        // Don't call logout here as it creates a circular dependency
         localStorage.removeItem('token');
         delete axios.defaults.headers.common['Authorization'];
         setToken(null);
@@ -52,7 +51,7 @@ export const useAuth = () => {
     }
   }, [dispatch]);
 
-  // Initialize auth state - NOW fetchUser is defined
+  // Initialize auth state
   useEffect(() => {
     const initAuth = async () => {
       const storedToken = localStorage.getItem('token');
@@ -66,9 +65,9 @@ export const useAuth = () => {
     };
 
     initAuth();
-  }, [fetchUser]); // Add fetchUser as dependency
+  }, [fetchUser]);
 
-  // Login
+  // 🔥 UPDATED LOGIN - Role-based redirect
   const login = useCallback(async (email, password, rememberMe = false) => {
     try {
       setLoading(true);
@@ -92,8 +91,12 @@ export const useAuth = () => {
 
       toast.success(`Welcome back, ${userData.displayName || 'Player'}! 🎮`);
       
-      // Navigate to dashboard
-      navigate('/');
+      // 🔥 ROLE-BASED REDIRECT
+      if (userData.role === 'admin') {
+        navigate('/admin');
+      } else {
+        navigate('/');
+      }
       
       return { success: true, user: userData };
     } catch (error) {
@@ -105,7 +108,7 @@ export const useAuth = () => {
     }
   }, [dispatch, navigate]);
 
-  // Register
+  // 🔥 UPDATED REGISTER - Role-based redirect
   const register = useCallback(async (userData) => {
     try {
       setLoading(true);
@@ -126,8 +129,12 @@ export const useAuth = () => {
 
       toast.success(`Welcome to Life RPG, ${newUser.displayName || 'Player'}! 🎮`);
       
-      // Navigate to dashboard
-      navigate('/');
+      // 🔥 ROLE-BASED REDIRECT
+      if (newUser.role === 'admin') {
+        navigate('/admin');
+      } else {
+        navigate('/');
+      }
       
       return { success: true, user: newUser };
     } catch (error) {
@@ -142,19 +149,13 @@ export const useAuth = () => {
   // Logout
   const logout = useCallback(async () => {
     try {
-      // Call logout API
       await axios.post('/auth/logout');
     } catch (error) {
       console.error('Logout API error:', error);
     } finally {
-      // Clear local storage
       localStorage.removeItem('token');
       localStorage.removeItem('rememberMe');
-      
-      // Clear axios headers
       delete axios.defaults.headers.common['Authorization'];
-      
-      // Clear state
       setToken(null);
       setUserState(null);
       setLoading(false);
@@ -163,8 +164,6 @@ export const useAuth = () => {
       dispatch(resetAI());
       
       toast.info('Logged out successfully');
-      
-      // Navigate to login
       navigate('/login');
     }
   }, [dispatch, navigate]);
@@ -281,7 +280,6 @@ export const useAuth = () => {
   // Update user XP (from WebSocket events)
   const updateUserXP = useCallback((xpGained) => {
     dispatch(updateXP(xpGained));
-    // Refresh user data to get updated level/rank
     fetchUser();
   }, [dispatch, fetchUser]);
 
@@ -289,7 +287,6 @@ export const useAuth = () => {
   const handleLevelUp = useCallback((levelData) => {
     dispatch(showLevelUp(levelData));
     toast.success(`🎉 Level Up! You've reached Level ${levelData.newLevel}!`);
-    // Refresh user data
     fetchUser();
   }, [dispatch, fetchUser]);
 
@@ -297,7 +294,6 @@ export const useAuth = () => {
   const handleRankUp = useCallback((rankData) => {
     dispatch(showRankUp(rankData));
     toast.success(`🏆 Rank Up! You've reached Rank ${rankData.newRank}!`);
-    // Refresh user data
     fetchUser();
   }, [dispatch, fetchUser]);
 

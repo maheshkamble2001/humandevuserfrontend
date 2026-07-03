@@ -70,6 +70,52 @@ import Button from '../components/common/Button';
 import Input from '../components/common/Input';
 import { toast } from 'react-toastify';
 
+// ============================================
+// HELPER FUNCTIONS (defined outside components)
+// ============================================
+
+const getRankIcon = (rank) => {
+  const icons = {
+    'E': Shield,
+    'D': StarIcon,
+    'C': Gem,
+    'B': Crown,
+    'A': Medal,
+    'S': Trophy,
+    'SS': AwardIcon,
+    'Mythic': Sparkles,
+  };
+  return icons[rank] || Shield;
+};
+
+const getRankColor = (rank) => {
+  const colors = {
+    'E': 'text-gray-400',
+    'D': 'text-blue-400',
+    'C': 'text-green-400',
+    'B': 'text-yellow-400',
+    'A': 'text-orange-400',
+    'S': 'text-red-400',
+    'SS': 'text-purple-400',
+    'Mythic': 'text-pink-400',
+  };
+  return colors[rank] || 'text-gray-400';
+};
+
+const getRankBgColor = (rank) => {
+  const colors = {
+    'E': 'bg-gray-400/20',
+    'D': 'bg-blue-400/20',
+    'C': 'bg-green-400/20',
+    'B': 'bg-yellow-400/20',
+    'A': 'bg-orange-400/20',
+    'S': 'bg-red-400/20',
+    'SS': 'bg-purple-400/20',
+    'Mythic': 'bg-pink-400/20',
+  };
+  return colors[rank] || 'bg-gray-400/20';
+};
+
 const Career = () => {
   const dispatch = useDispatch();
   const { user } = useAuth();
@@ -256,48 +302,6 @@ const Career = () => {
   const currentSkills = skillsData[selectedCareer] || [];
   const currentMissions = missionsData[selectedCareer] || [];
 
-  const getRankIcon = (rank) => {
-    const icons = {
-      'E': Shield,
-      'D': StarIcon,
-      'C': Gem,
-      'B': Crown,
-      'A': Medal,
-      'S': Trophy,
-      'SS': AwardIcon,
-      'Mythic': Sparkles,
-    };
-    return icons[rank] || Shield;
-  };
-
-  const getRankColor = (rank) => {
-    const colors = {
-      'E': 'text-gray-400',
-      'D': 'text-blue-400',
-      'C': 'text-green-400',
-      'B': 'text-yellow-400',
-      'A': 'text-orange-400',
-      'S': 'text-red-400',
-      'SS': 'text-purple-400',
-      'Mythic': 'text-pink-400',
-    };
-    return colors[rank] || 'text-gray-400';
-  };
-
-  const getRankBgColor = (rank) => {
-    const colors = {
-      'E': 'bg-gray-400/20',
-      'D': 'bg-blue-400/20',
-      'C': 'bg-green-400/20',
-      'B': 'bg-yellow-400/20',
-      'A': 'bg-orange-400/20',
-      'S': 'bg-red-400/20',
-      'SS': 'bg-purple-400/20',
-      'Mythic': 'bg-pink-400/20',
-    };
-    return colors[rank] || 'bg-gray-400/20';
-  };
-
   const handleCareerSwitch = (careerId) => {
     setSelectedCareer(careerId);
     setShowCareerSwitch(false);
@@ -395,7 +399,7 @@ const Career = () => {
           {['overview', 'skills', 'missions', 'progress', 'resources'].map((tab) => (
             <button
               key={tab}
-              onClick={() => setActiveTab(tab)}
+              onClick={() => setActiveTab(tab.id)}
               className={`
                 px-4 py-2 text-sm font-medium transition border-b-2 whitespace-nowrap
                 ${activeTab === tab 
@@ -476,7 +480,7 @@ const Career = () => {
 };
 
 // ============================================
-// Sub-Components
+// SUB-COMPONENTS
 // ============================================
 
 // Overview Tab
@@ -731,7 +735,6 @@ const MissionsTab = ({ missions }) => {
 // Progress Tab
 const ProgressTab = ({ career, skills }) => {
   const averageSkill = skills.reduce((sum, s) => sum + s.level, 0) / (skills.length || 1);
-  const completedMissions = 0; // Would come from props
 
   return (
     <div className="space-y-6">

@@ -15,7 +15,6 @@ import {
   ArrowRight,
   CheckCircle,
   AlertCircle,
-  Loader,
 } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import Button from '../components/common/Button';
@@ -39,7 +38,6 @@ const Login = () => {
     register,
     handleSubmit,
     formState: { errors },
-    watch,
   } = useForm({
     resolver: yupResolver(loginSchema),
     defaultValues: {
@@ -63,7 +61,14 @@ const Login = () => {
     const result = await login(data.email, data.password, data.rememberMe);
     
     if (result.success) {
-      navigate(from, { replace: true });
+      // 🔥 Role-based redirect - Check user role from response
+      const userRole = result.user?.role || 'user';
+      
+      if (userRole === 'admin') {
+        navigate('/admin', { replace: true });
+      } else {
+        navigate(from, { replace: true });
+      }
     } else {
       setError(result.error);
     }

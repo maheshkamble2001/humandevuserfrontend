@@ -1,5 +1,5 @@
 // src/context/AuthContext.jsx
-import React, { createContext, useState, useContext, useEffect, useCallback } from 'react';
+import React, { createContext, useState, useContext, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from '../api/axios';
 import { toast } from 'react-toastify';
@@ -14,12 +14,6 @@ export const useAuth = () => {
   return context;
 };
 
-// Navigation wrapper component
-const NavigationWrapper = ({ children }) => {
-  const navigate = useNavigate();
-  return children(navigate);
-};
-
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -27,15 +21,12 @@ export const AuthProvider = ({ children }) => {
   const [token, setToken] = useState(localStorage.getItem('token'));
   const [refreshing, setRefreshing] = useState(false);
   
-  // Use a ref to store navigate function
-  const navigateRef = React.useRef(null);
+  const navigateRef = useRef(null);
 
-  // Set navigate function when available
   const setNavigate = (navigate) => {
     navigateRef.current = navigate;
   };
 
-  // Get navigate function
   const getNavigate = () => {
     if (!navigateRef.current) {
       console.warn('Navigate not available yet');
@@ -50,17 +41,23 @@ export const AuthProvider = ({ children }) => {
       const response = await axios.get('/user/profile');
       setUser(response.data);
       setError(null);
+      setLoading(false);
       return response.data;
     } catch (error) {
       console.error('Error fetching user:', error);
-      if (error.response?.status === 401) {
-        logout();
+      
+      if (error.code === 'ERR_NETWORK' || error.message === 'Network Error') {
+        setError('Cannot connect to server. Please check if backend is running.');
+        toast.error('Server connection failed');
+      } else if (error.response?.status === 401) {
+        localStorage.removeItem('token');
+        setToken(null);
+        setUser(null);
       } else {
         setError(error.response?.data?.message || 'Failed to fetch user');
       }
-      throw error;
-    } finally {
       setLoading(false);
+      throw error;
     }
   }, []);
 
@@ -108,7 +105,7 @@ export const AuthProvider = ({ children }) => {
     return () => clearInterval(refreshInterval);
   }, [token, refreshing]);
 
-  // Login
+  // 🔥 UPDATED LOGIN - Role-based redirect
   const login = async (email, password, rememberMe = false) => {
     try {
       setLoading(true);
@@ -127,13 +124,22 @@ export const AuthProvider = ({ children }) => {
       
       toast.success(`Welcome back, ${user.displayName || 'Player'}! 🎮`);
       
-      // Navigate to dashboard
+      // 🔥 ROLE-BASED REDIRECT
       const navigate = getNavigate();
-      navigate('/');
+      if (user.role === 'admin') {
+        navigate('/admin');
+      } else {
+        navigate('/');
+      }
       
       return { success: true, user };
     } catch (error) {
-      const errorMessage = error.response?.data?.message || 'Login failed. Please try again.';
+      let errorMessage = 'Login failed. Please try again.';
+      if (error.code === 'ERR_NETWORK' || error.message === 'Network Error') {
+        errorMessage = 'Cannot connect to server. Please check your connection.';
+      } else if (error.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      }
       setError(errorMessage);
       toast.error(errorMessage);
       return { success: false, error: errorMessage };
@@ -159,11 +165,20 @@ export const AuthProvider = ({ children }) => {
       toast.success(`Welcome to Life RPG, ${user.displayName || 'Player'}! 🎮`);
       
       const navigate = getNavigate();
-      navigate('/');
+      if (user.role === 'admin') {
+        navigate('/admin');
+      } else {
+        navigate('/');
+      }
       
       return { success: true, user };
     } catch (error) {
-      const errorMessage = error.response?.data?.message || 'Registration failed. Please try again.';
+      let errorMessage = 'Registration failed. Please try again.';
+      if (error.code === 'ERR_NETWORK' || error.message === 'Network Error') {
+        errorMessage = 'Cannot connect to server. Please check your connection.';
+      } else if (error.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      }
       setError(errorMessage);
       toast.error(errorMessage);
       return { success: false, error: errorMessage };
@@ -320,7 +335,7 @@ export const AuthProvider = ({ children }) => {
     token,
     isAuthenticated: !!user && !!token,
     refreshing,
-    setNavigate, // Add this to set navigate function
+    setNavigate,
     login,
     register,
     logout,
@@ -348,10 +363,9 @@ export const AuthProvider = ({ children }) => {
 // Navigation wrapper component to inject navigate
 export const AuthProviderWithNavigate = ({ children }) => {
   const navigate = useNavigate();
-  const authContext = React.useContext(AuthContext);
+  const authContext = useContext(AuthContext);
   
-  // Set navigate function when available
-  React.useEffect(() => {
+  useEffect(() => {
     if (authContext?.setNavigate) {
       authContext.setNavigate(navigate);
     }

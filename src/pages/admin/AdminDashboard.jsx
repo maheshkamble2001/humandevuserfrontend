@@ -26,10 +26,10 @@ import {
   XCircle,
   Loader,
 } from 'lucide-react';
+import { useAuth } from '../../hooks/useAuth';
 import AdminStatsCard from '../../components/admin/AdminStatsCard';
 import AdminChart from '../../components/admin/AdminChart';
 import AdminTable from '../../components/admin/AdminTable';
-import { useAuth } from '../../hooks/useAuth';
 import { toast } from 'react-toastify';
 
 const AdminDashboard = () => {
@@ -63,7 +63,15 @@ const AdminDashboard = () => {
         }
       });
       const activityData = await activityResponse.json();
-      setRecentActivity(activityData);
+      
+      // ✅ FIX: Ensure activityData is an array
+      if (Array.isArray(activityData)) {
+        setRecentActivity(activityData);
+      } else if (activityData?.activities && Array.isArray(activityData.activities)) {
+        setRecentActivity(activityData.activities);
+      } else {
+        setRecentActivity([]);
+      }
 
       // Fetch growth data
       const growthResponse = await fetch(`/api/admin/growth?period=${timeframe}`, {
@@ -72,10 +80,19 @@ const AdminDashboard = () => {
         }
       });
       const growthData = await growthResponse.json();
-      setGrowthData(growthData);
+      
+      // ✅ FIX: Ensure growthData is an array
+      if (Array.isArray(growthData)) {
+        setGrowthData(growthData);
+      } else {
+        setGrowthData([]);
+      }
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
       toast.error('Failed to load dashboard data');
+      // ✅ FIX: Set empty arrays on error
+      setRecentActivity([]);
+      setGrowthData([]);
     } finally {
       setIsLoading(false);
     }
@@ -115,6 +132,9 @@ const AdminDashboard = () => {
       period: 'This month',
     },
   ];
+
+  // ✅ FIX: Ensure recentActivity is an array before rendering
+  const hasRecentActivity = recentActivity && Array.isArray(recentActivity) && recentActivity.length > 0;
 
   if (isLoading) {
     return <AdminLoadingSkeleton />;
@@ -204,28 +224,39 @@ const AdminDashboard = () => {
           </button>
         </div>
         <div className="space-y-3">
-          {recentActivity.map((activity, index) => (
-            <motion.div
-              key={index}
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: index * 0.03 }}
-              className="flex items-center gap-3 p-3 bg-white/5 rounded-lg hover:bg-white/10 transition"
-            >
-              <div className={`p-2 rounded-lg ${getActivityColor(activity.type)}`}>
-                {getActivityIcon(activity.type)}
-              </div>
-              <div className="flex-1">
-                <p className="text-sm text-white">{activity.message}</p>
-                <p className="text-xs text-gray-400">
-                  {new Date(activity.timestamp).toLocaleString()}
-                </p>
-              </div>
-              <span className={`text-xs px-2 py-1 rounded-full ${getStatusColor(activity.status)}`}>
-                {activity.status}
-              </span>
-            </motion.div>
-          ))}
+          {isLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader className="w-6 h-6 text-primary-400 animate-spin" />
+            </div>
+          ) : !hasRecentActivity ? (
+            <div className="text-center py-8 text-gray-400">
+              <Activity className="w-8 h-8 mx-auto mb-2 text-gray-500" />
+              <p>No recent activity</p>
+            </div>
+          ) : (
+            recentActivity.map((activity, index) => (
+              <motion.div
+                key={activity.id || index}
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: index * 0.03 }}
+                className="flex items-center gap-3 p-3 bg-white/5 rounded-lg hover:bg-white/10 transition"
+              >
+                <div className={`p-2 rounded-lg ${getActivityColor(activity.type)}`}>
+                  {getActivityIcon(activity.type)}
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm text-white">{activity.message || 'Activity'}</p>
+                  <p className="text-xs text-gray-400">
+                    {activity.timestamp ? new Date(activity.timestamp).toLocaleString() : 'Just now'}
+                  </p>
+                </div>
+                <span className={`text-xs px-2 py-1 rounded-full ${getStatusColor(activity.status || 'completed')}`}>
+                  {activity.status || 'completed'}
+                </span>
+              </motion.div>
+            ))
+          )}
         </div>
       </div>
     </div>

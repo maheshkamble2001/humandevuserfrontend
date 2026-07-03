@@ -6,6 +6,7 @@ const Input = forwardRef(({
   error,
   className = '',
   icon: Icon,
+  rightIcon: RightIcon,
   iconPosition = 'left',
   helperText,
   required,
@@ -20,11 +21,13 @@ const Input = forwardRef(({
         </label>
       )}
       <div className="relative">
+        {/* Left Icon */}
         {Icon && iconPosition === 'left' && (
           <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">
             <Icon className="w-4 h-4" />
           </div>
         )}
+        
         <input
           ref={ref}
           className={`
@@ -33,17 +36,27 @@ const Input = forwardRef(({
             focus:outline-none focus:ring-2 focus:ring-primary-500
             transition duration-200
             ${Icon && iconPosition === 'left' ? 'pl-10' : ''}
-            ${Icon && iconPosition === 'right' ? 'pr-10' : ''}
+            ${(RightIcon || (Icon && iconPosition === 'right')) ? 'pr-10' : ''}
             ${error ? 'border-red-500 focus:ring-red-500' : 'border-white/10'}
           `}
           {...props}
         />
-        {Icon && iconPosition === 'right' && (
+        
+        {/* Right Icon */}
+        {RightIcon && (
+          <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+            {RightIcon}
+          </div>
+        )}
+        
+        {/* Right Icon from icon prop */}
+        {Icon && iconPosition === 'right' && !RightIcon && (
           <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400">
             <Icon className="w-4 h-4" />
           </div>
         )}
       </div>
+      
       {error && (
         <p className="mt-1 text-sm text-red-400">{error}</p>
       )}

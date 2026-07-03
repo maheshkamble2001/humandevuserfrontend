@@ -24,14 +24,19 @@ import {
   Upload,
   ChevronLeft,
   ChevronRight,
+  Loader,
+  Users, // ✅ ADD THIS IMPORT
 } from 'lucide-react';
+import { useAuth } from '../../hooks/useAuth';
 import AdminTable from '../../components/admin/AdminTable';
 import AdminModal from '../../components/admin/AdminModal';
+import AdminStatsCard from '../../components/admin/AdminStatsCard';
 import Button from '../../components/common/Button';
 import Input from '../../components/common/Input';
 import { toast } from 'react-toastify';
 
 const AdminUsers = () => {
+  const { user } = useAuth();
   const [users, setUsers] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -66,17 +71,6 @@ const AdminUsers = () => {
       setIsLoading(false);
     }
   };
-
-  const columns = [
-    { key: 'id', label: 'ID', sortable: true },
-    { key: 'displayName', label: 'Name', sortable: true },
-    { key: 'email', label: 'Email', sortable: true },
-    { key: 'level', label: 'Level', sortable: true },
-    { key: 'rank', label: 'Rank', sortable: true },
-    { key: 'status', label: 'Status', sortable: true },
-    { key: 'createdAt', label: 'Joined', sortable: true },
-    { key: 'actions', label: 'Actions', sortable: false },
-  ];
 
   const handleViewUser = (user) => {
     setSelectedUser(user);
@@ -133,6 +127,17 @@ const AdminUsers = () => {
     }
   };
 
+  const columns = [
+    { key: 'id', label: 'ID', sortable: true },
+    { key: 'displayName', label: 'Name', sortable: true },
+    { key: 'email', label: 'Email', sortable: true },
+    { key: 'level', label: 'Level', sortable: true },
+    { key: 'rank', label: 'Rank', sortable: true },
+    { key: 'status', label: 'Status', sortable: true },
+    { key: 'createdAt', label: 'Joined', sortable: true },
+    { key: 'actions', label: 'Actions', sortable: false },
+  ];
+
   const getStatusBadge = (status) => {
     const badges = {
       active: 'bg-green-500/20 text-green-400',
@@ -158,7 +163,27 @@ const AdminUsers = () => {
   };
 
   if (isLoading && users.length === 0) {
-    return <AdminLoadingSkeleton />;
+    return (
+      <div className="space-y-6 animate-pulse">
+        <div className="flex items-center justify-between">
+          <div>
+            <div className="h-8 w-48 bg-white/5 rounded"></div>
+            <div className="h-4 w-64 bg-white/5 rounded mt-2"></div>
+          </div>
+          <div className="flex gap-2">
+            <div className="h-10 w-24 bg-white/5 rounded"></div>
+            <div className="h-10 w-32 bg-white/5 rounded"></div>
+          </div>
+        </div>
+        <div className="grid grid-cols-4 gap-4">
+          {[1, 2, 3, 4].map(i => (
+            <div key={i} className="h-32 bg-white/5 rounded-xl"></div>
+          ))}
+        </div>
+        <div className="h-16 bg-white/5 rounded-xl"></div>
+        <div className="h-96 bg-white/5 rounded-xl"></div>
+      </div>
+    );
   }
 
   return (
@@ -182,6 +207,34 @@ const AdminUsers = () => {
         </div>
       </div>
 
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <AdminStatsCard
+          icon={Users}
+          label="Total Users"
+          value={users.length || 0}
+          color="primary"
+        />
+        <AdminStatsCard
+          icon={CheckCircle}
+          label="Active"
+          value={users.filter(u => u.status === 'active').length || 0}
+          color="success"
+        />
+        <AdminStatsCard
+          icon={XCircle}
+          label="Inactive"
+          value={users.filter(u => u.status === 'inactive').length || 0}
+          color="danger"
+        />
+        <AdminStatsCard
+          icon={Crown}
+          label="Admins"
+          value={users.filter(u => u.role === 'admin').length || 0}
+          color="warning"
+        />
+      </div>
+
       {/* Filters */}
       <div className="glass-effect rounded-xl p-4 border border-white/20">
         <div className="flex flex-col sm:flex-row gap-3">
@@ -203,7 +256,6 @@ const AdminUsers = () => {
               <option value="active">Active</option>
               <option value="inactive">Inactive</option>
               <option value="banned">Banned</option>
-              <option value="premium">Premium</option>
             </select>
             <select
               value={bulkAction}
@@ -478,6 +530,31 @@ const UserDetailModal = ({ user, mode, onClose, onUpdate }) => {
       </div>
     </form>
   );
+};
+
+// Helper functions
+const getStatusBadge = (status) => {
+  const badges = {
+    active: 'bg-green-500/20 text-green-400',
+    inactive: 'bg-gray-500/20 text-gray-400',
+    banned: 'bg-red-500/20 text-red-400',
+    pending: 'bg-yellow-500/20 text-yellow-400',
+  };
+  return badges[status] || badges.active;
+};
+
+const getRankBadge = (rank) => {
+  const badges = {
+    'E': 'bg-gray-500/20 text-gray-400',
+    'D': 'bg-blue-500/20 text-blue-400',
+    'C': 'bg-green-500/20 text-green-400',
+    'B': 'bg-yellow-500/20 text-yellow-400',
+    'A': 'bg-orange-500/20 text-orange-400',
+    'S': 'bg-red-500/20 text-red-400',
+    'SS': 'bg-purple-500/20 text-purple-400',
+    'Mythic': 'bg-pink-500/20 text-pink-400',
+  };
+  return badges[rank] || badges['E'];
 };
 
 export default AdminUsers;

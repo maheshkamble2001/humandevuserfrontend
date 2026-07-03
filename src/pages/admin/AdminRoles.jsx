@@ -1,0 +1,1189 @@
+// src/pages/admin/AdminRoles.jsx
+import React, { useState, useEffect } from 'react';
+import { motion } from 'framer-motion';
+import {
+  Shield,
+  Plus,
+  Edit2,
+  Trash2,
+  Eye,
+  Save,
+  X,
+  Crown,
+  UserCog,
+  User,
+  Users,
+  Lock,
+  Unlock,
+  CheckCircle,
+  XCircle,
+  AlertCircle,
+  Loader,
+  RefreshCw,
+  Search,
+  Filter,
+  ChevronLeft,
+  ChevronRight,
+  MoreVertical,
+  Copy,
+  Check,
+  AlertTriangle,
+  Pencil,
+  Eye as EyeIcon,
+  Trash2 as TrashIcon,
+  Copy as CopyIcon,
+  MoreHorizontal,
+  UserPlus,
+  UserMinus,
+  UserCheck,
+  UserX,
+  Settings,
+  Star,
+  StarOff,
+  Clock,
+  Ban,
+  ShieldCheck,
+  ShieldAlert,
+  ShieldQuestion,
+  // ✅ Add custom icons for rendering
+  BadgeCheck,
+  UserCog as UserCogIcon,
+  CheckCircle as CheckCircleIcon,
+  XCircle as XCircleIcon,
+} from 'lucide-react';
+import { useAuth } from '../../hooks/useAuth';
+import { roleService } from '../../api/services/roleService';
+import Button from '../../components/common/Button';
+import Input from '../../components/common/Input';
+import AdminModal from '../../components/admin/AdminModal';
+import AdminTable, { TableRenderer } from '../../components/admin/AdminTable';
+import AdminStatsCard from '../../components/admin/AdminStatsCard';
+import { toast } from 'react-toastify';
+
+const AdminRoles = () => {
+  const { user } = useAuth();
+  const [roles, setRoles] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedRole, setSelectedRole] = useState(null);
+  const [showModal, setShowModal] = useState(false);
+  const [modalType, setModalType] = useState('view');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [selectedRoles, setSelectedRoles] = useState([]);
+  const [bulkAction, setBulkAction] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showActionsMenu, setShowActionsMenu] = useState(null);
+
+  // Form state
+  const [formData, setFormData] = useState({
+    name: '',
+    slug: '',
+    description: '',
+    color: '#7d26ff',
+    backgroundColor: 'rgba(125, 38, 255, 0.1)',
+    icon: 'Shield',
+    level: 1,
+    priority: 0,
+    isDefault: false,
+    isActive: true,
+    permissions: {
+      read: true,
+      write: false,
+      delete: false,
+      manage: false,
+      users: false,
+      content: false,
+      settings: false,
+    }
+  });
+
+  const [formErrors, setFormErrors] = useState({});
+  const [permissionsStructure, setPermissionsStructure] = useState({});
+
+  useEffect(() => {
+    fetchRoles();
+    fetchPermissionsStructure();
+  }, [currentPage, searchTerm]);
+
+  const fetchRoles = async () => {
+    setIsLoading(true);
+    try {
+      const data = await roleService.getRoles({
+        page: currentPage,
+        limit: 20,
+        search: searchTerm
+      });
+      setRoles(data.roles || []);
+      setTotalPages(data.totalPages || 1);
+    } catch (error) {
+      console.error('Error fetching roles:', error);
+      toast.error(error.message || 'Failed to load roles');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const fetchPermissionsStructure = async () => {
+    try {
+      const data = await roleService.getPermissionsStructure();
+      setPermissionsStructure(data);
+    } catch (error) {
+      console.error('Error fetching permissions structure:', error);
+    }
+  };
+
+  // ============================================
+  // ACTION HANDLERS
+  // ============================================
+
+  const handleView = (role) => {
+    setSelectedRole(role);
+    setModalType('view');
+    setShowModal(true);
+    setShowActionsMenu(null);
+  };
+
+  const handleEdit = (role) => {
+    setSelectedRole(role);
+    setFormData({
+      name: role.name || '',
+      slug: role.slug || '',
+      description: role.description || '',
+      color: role.color || '#7d26ff',
+      backgroundColor: role.backgroundColor || 'rgba(125, 38, 255, 0.1)',
+      icon: role.icon || 'Shield',
+      level: role.level || 1,
+      priority: role.priority || 0,
+      isDefault: role.isDefault || false,
+      isActive: role.isActive !== undefined ? role.isActive : true,
+      permissions: role.permissions || {
+        read: true,
+        write: false,
+        delete: false,
+        manage: false,
+        users: false,
+        content: false,
+        settings: false,
+      }
+    });
+    setFormErrors({});
+    setModalType('edit');
+    setShowModal(true);
+    setShowActionsMenu(null);
+  };
+
+  const handleDelete = async (role) => {
+    setShowActionsMenu(null);
+    if (!window.confirm(`Are you sure you want to delete role "${role.name}"? This action cannot be undone.`)) return;
+
+    try {
+      setIsSubmitting(true);
+      await roleService.deleteRole(role.id);
+      toast.success('Role deleted successfully');
+      await fetchRoles();
+    } catch (error) {
+      console.error('Error deleting role:', error);
+      toast.error(error.message || 'Failed to delete role');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleDuplicate = async (role) => {
+    setShowActionsMenu(null);
+    try {
+      const newRole = {
+        ...role,
+        name: `${role.name} (Copy)`,
+        slug: `${role.slug}-copy-${Date.now()}`,
+        isDefault: false,
+        isActive: true,
+      };
+      delete newRole.id;
+      delete newRole.createdAt;
+      delete newRole.updatedAt;
+      
+      await roleService.createRole(newRole);
+      toast.success('Role duplicated successfully!');
+      await fetchRoles();
+    } catch (error) {
+      console.error('Error duplicating role:', error);
+      toast.error(error.message || 'Failed to duplicate role');
+    }
+  };
+
+  const handleToggleActive = async (role) => {
+    setShowActionsMenu(null);
+    try {
+      await roleService.updateRole(role.id, { 
+        ...role, 
+        isActive: !role.isActive 
+      });
+      toast.success(`Role ${role.isActive ? 'deactivated' : 'activated'} successfully`);
+      await fetchRoles();
+    } catch (error) {
+      console.error('Error toggling role status:', error);
+      toast.error(error.message || 'Failed to toggle role status');
+    }
+  };
+
+  const handleToggleDefault = async (role) => {
+    setShowActionsMenu(null);
+    try {
+      await roleService.updateRole(role.id, { 
+        ...role, 
+        isDefault: !role.isDefault 
+      });
+      toast.success(`Role ${role.isDefault ? 'removed from default' : 'set as default'} successfully`);
+      await fetchRoles();
+    } catch (error) {
+      console.error('Error toggling default status:', error);
+      toast.error(error.message || 'Failed to toggle default status');
+    }
+  };
+
+  const handleViewUsers = (role) => {
+    setShowActionsMenu(null);
+    toast.info(`Viewing users with role: ${role.name}`);
+  };
+
+  const handleCopyName = (role) => {
+    setShowActionsMenu(null);
+    navigator.clipboard.writeText(role.name);
+    toast.success('Role name copied to clipboard!');
+  };
+
+  const handleCopyId = (role) => {
+    setShowActionsMenu(null);
+    navigator.clipboard.writeText(role.id);
+    toast.success('Role ID copied to clipboard!');
+  };
+
+  // ============================================
+  // BULK ACTIONS
+  // ============================================
+  const handleBulkAction = async () => {
+    if (!bulkAction || selectedRoles.length === 0) return;
+
+    if (!window.confirm(`Are you sure you want to perform "${bulkAction}" on ${selectedRoles.length} roles?`)) return;
+
+    try {
+      setIsSubmitting(true);
+      await roleService.bulkUpdateRoles({
+        roleIds: selectedRoles,
+        action: bulkAction
+      });
+      toast.success(`Successfully performed ${bulkAction} on ${selectedRoles.length} roles`);
+      setSelectedRoles([]);
+      setBulkAction('');
+      await fetchRoles();
+    } catch (error) {
+      console.error('Error performing bulk action:', error);
+      toast.error(error.message || 'Failed to perform bulk action');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // ============================================
+  // CREATE/UPDATE
+  // ============================================
+  const handleCreate = () => {
+    setFormData({
+      name: '',
+      slug: '',
+      description: '',
+      color: '#7d26ff',
+      backgroundColor: 'rgba(125, 38, 255, 0.1)',
+      icon: 'Shield',
+      level: 1,
+      priority: 0,
+      isDefault: false,
+      isActive: true,
+      permissions: {
+        read: true,
+        write: false,
+        delete: false,
+        manage: false,
+        users: false,
+        content: false,
+        settings: false,
+      }
+    });
+    setFormErrors({});
+    setModalType('create');
+    setShowModal(true);
+  };
+
+  const handleSubmit = async () => {
+    const errors = {};
+    if (!formData.name.trim()) errors.name = 'Name is required';
+    if (!formData.slug.trim()) errors.slug = 'Slug is required';
+
+    if (Object.keys(errors).length > 0) {
+      setFormErrors(errors);
+      toast.error('Please fix form errors');
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+      if (modalType === 'create') {
+        await roleService.createRole(formData);
+        toast.success('Role created successfully!');
+      } else {
+        await roleService.updateRole(selectedRole.id, formData);
+        toast.success('Role updated successfully!');
+      }
+      
+      setShowModal(false);
+      await fetchRoles();
+    } catch (error) {
+      console.error('Error saving role:', error);
+      
+      if (error.errors && Array.isArray(error.errors)) {
+        const validationErrors = {};
+        error.errors.forEach(err => {
+          validationErrors[err.field] = err.message;
+        });
+        setFormErrors(validationErrors);
+        toast.error('Please fix validation errors');
+      } else {
+        toast.error(error.message || 'Failed to save role');
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // ============================================
+  // FORM HANDLERS
+  // ============================================
+  const handleFormChange = (e) => {
+    const { name, value, type, checked } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: type === 'checkbox' ? checked : value,
+    }));
+    if (formErrors[name]) {
+      setFormErrors(prev => ({ ...prev, [name]: null }));
+    }
+  };
+
+  const handlePermissionChange = (permission) => {
+    setFormData(prev => ({
+      ...prev,
+      permissions: {
+        ...prev.permissions,
+        [permission]: !prev.permissions[permission]
+      }
+    }));
+  };
+
+  const handleCloseModal = () => {
+    setShowModal(false);
+    setFormErrors({});
+  };
+
+  // ============================================
+  // ✅ CUSTOM COLUMNS WITH CUSTOM RENDERERS
+  // ============================================
+  const columns = [
+    { 
+      key: 'name', 
+      label: 'Role Name', 
+      sortable: true,
+      type: 'custom',
+      // ✅ Custom renderer for Name column with icon
+      render: (value, row) => {
+        const Icon = getRoleIcon(row.icon);
+        return (
+          <div className="flex items-center gap-3">
+            <div 
+              className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+              style={{ backgroundColor: row.backgroundColor || `${row.color}20` }}
+            >
+              <Icon className="w-5 h-5" style={{ color: row.color }} />
+            </div>
+            <div>
+              <p className="font-medium text-white">{value}</p>
+              <p className="text-xs text-gray-400">Slug: {row.slug}</p>
+            </div>
+          </div>
+        );
+      }
+    },
+    { 
+      key: 'level', 
+      label: 'Level', 
+      sortable: true,
+      type: 'badge',
+      // ✅ Custom renderer for Level
+      render: (value) => (
+        <div className="flex items-center gap-1.5">
+          <ShieldCheck className="w-4 h-4 text-primary-400" />
+          <span className="font-medium text-white">Lv. {value}</span>
+        </div>
+      )
+    },
+    { 
+      key: 'priority', 
+      label: 'Priority', 
+      sortable: true,
+      type: 'badge',
+      // ✅ Custom renderer for Priority
+      render: (value) => (
+        <div className="flex items-center gap-1.5">
+          <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+            value >= 3 ? 'bg-green-500/20 text-green-400' :
+            value >= 2 ? 'bg-yellow-500/20 text-yellow-400' :
+            'bg-gray-500/20 text-gray-400'
+          }`}>
+            {value}
+          </span>
+        </div>
+      )
+    },
+    { 
+      key: 'users', 
+      label: 'Users', 
+      sortable: true,
+      type: 'badge',
+      // ✅ Custom renderer for Users count
+      render: (value) => (
+        <div className="flex items-center gap-1.5">
+          <Users className="w-4 h-4 text-blue-400" />
+          <span className="font-medium text-white">{value || 0}</span>
+          <span className="text-xs text-gray-400">users</span>
+        </div>
+      )
+    },
+    { 
+      key: 'isDefault', 
+      label: 'Default', 
+      sortable: true,
+      type: 'boolean',
+      // ✅ Custom renderer for Default status
+      render: (value) => (
+        <div className="flex items-center gap-1.5">
+          {value ? (
+            <>
+              <Star className="w-4 h-4 text-yellow-400 fill-yellow-400" />
+              <span className="text-xs text-yellow-400 font-medium">Default</span>
+            </>
+          ) : (
+            <>
+              <StarOff className="w-4 h-4 text-gray-500" />
+              <span className="text-xs text-gray-500">-</span>
+            </>
+          )}
+        </div>
+      )
+    },
+    { 
+      key: 'isActive', 
+      label: 'Active', 
+      sortable: true,
+      type: 'status',
+      // ✅ Custom renderer for Active status
+      render: (value) => (
+        <div className="flex items-center gap-1.5">
+          {value ? (
+            <>
+              <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
+              <span className="text-xs text-green-400 font-medium">Active</span>
+            </>
+          ) : (
+            <>
+              <div className="w-2 h-2 bg-gray-500 rounded-full" />
+              <span className="text-xs text-gray-500">Inactive</span>
+            </>
+          )}
+        </div>
+      )
+    },
+    { 
+      key: 'actions', 
+      label: 'Actions', 
+      sortable: false,
+      // ✅ Actions column with all actions
+      render: (value, row) => (
+        <div className="flex items-center gap-1.5">
+          {/* View Button */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              handleView(row);
+            }}
+            className="p-1.5 hover:bg-white/10 rounded-lg transition group"
+            title="View Role"
+            disabled={isSubmitting}
+          >
+            <EyeIcon className="w-4 h-4 text-gray-400 group-hover:text-white transition" />
+          </button>
+
+          {/* Edit Button */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              handleEdit(row);
+            }}
+            className="p-1.5 hover:bg-white/10 rounded-lg transition group"
+            title="Edit Role"
+            disabled={isSubmitting}
+          >
+            <Pencil className="w-4 h-4 text-blue-400 group-hover:text-blue-300 transition" />
+          </button>
+
+          {/* Delete Button */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              handleDelete(row);
+            }}
+            className="p-1.5 hover:bg-white/10 rounded-lg transition group"
+            title="Delete Role"
+            disabled={isSubmitting}
+          >
+            <TrashIcon className="w-4 h-4 text-red-400 group-hover:text-red-300 transition" />
+          </button>
+
+          {/* More Actions Dropdown */}
+          <div className="relative">
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowActionsMenu(showActionsMenu === row.id ? null : row.id);
+              }}
+              className="p-1.5 hover:bg-white/10 rounded-lg transition group"
+              title="More Actions"
+              disabled={isSubmitting}
+            >
+              <MoreHorizontal className="w-4 h-4 text-gray-400 group-hover:text-white transition" />
+            </button>
+
+            {/* Dropdown Menu */}
+            {showActionsMenu === row.id && (
+              <div className="absolute right-0 mt-1 w-48 bg-dark-800 rounded-lg shadow-xl border border-white/10 overflow-hidden z-50">
+                <div className="py-1">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDuplicate(row);
+                    }}
+                    className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-300 hover:bg-white/5 transition"
+                  >
+                    <CopyIcon className="w-4 h-4" />
+                    Duplicate Role
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleToggleActive(row);
+                    }}
+                    className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-300 hover:bg-white/5 transition"
+                  >
+                    {row.isActive ? (
+                      <>
+                        <Ban className="w-4 h-4 text-yellow-400" />
+                        Deactivate
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle className="w-4 h-4 text-green-400" />
+                        Activate
+                      </>
+                    )}
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleToggleDefault(row);
+                    }}
+                    className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-300 hover:bg-white/5 transition"
+                  >
+                    {row.isDefault ? (
+                      <>
+                        <StarOff className="w-4 h-4 text-yellow-400" />
+                        Remove Default
+                      </>
+                    ) : (
+                      <>
+                        <Star className="w-4 h-4 text-yellow-400" />
+                        Set as Default
+                      </>
+                    )}
+                  </button>
+                  <div className="border-t border-white/10 my-1"></div>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleViewUsers(row);
+                    }}
+                    className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-300 hover:bg-white/5 transition"
+                  >
+                    <Users className="w-4 h-4" />
+                    View Users
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleCopyName(row);
+                    }}
+                    className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-300 hover:bg-white/5 transition"
+                  >
+                    <CopyIcon className="w-4 h-4" />
+                    Copy Name
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleCopyId(row);
+                    }}
+                    className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-300 hover:bg-white/5 transition"
+                  >
+                    <CopyIcon className="w-4 h-4" />
+                    Copy ID
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )
+    },
+  ];
+
+  const getRoleIcon = (iconName) => {
+    const icons = {
+      Shield, Crown, UserCog, User, Users
+    };
+    return icons[iconName] || Shield;
+  };
+
+  // ============================================
+  // PERMISSION CHECK
+  // ============================================
+  const canManageRoles = user?.permissions?.roles?.manage || user?.role === 'admin';
+
+  if (isLoading && roles.length === 0) {
+    return <AdminLoadingSkeleton />;
+  }
+
+  if (!canManageRoles) {
+    return (
+      <div className="min-h-[400px] flex items-center justify-center">
+        <div className="text-center">
+          <Shield className="w-16 h-16 text-red-400 mx-auto mb-4" />
+          <h2 className="text-2xl font-bold text-white">Access Denied</h2>
+          <p className="text-gray-400 mt-2">You don't have permission to manage roles.</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold gradient-text">Role Management</h1>
+          <p className="text-gray-400">Manage user roles and permissions</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="small"
+            icon={RefreshCw}
+            onClick={fetchRoles}
+            disabled={isSubmitting}
+          >
+            Refresh
+          </Button>
+          <Button
+            variant="gradient"
+            size="small"
+            icon={Plus}
+            onClick={handleCreate}
+            disabled={isSubmitting}
+          >
+            Create Role
+          </Button>
+        </div>
+      </div>
+
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <AdminStatsCard
+          icon={Shield}
+          label="Total Roles"
+          value={roles.length || 0}
+          color="primary"
+        />
+        <AdminStatsCard
+          icon={CheckCircle}
+          label="Active Roles"
+          value={roles.filter(r => r.isActive).length || 0}
+          color="success"
+        />
+        <AdminStatsCard
+          icon={Crown}
+          label="Admin Roles"
+          value={roles.filter(r => r.slug === 'admin').length || 0}
+          color="warning"
+        />
+        <AdminStatsCard
+          icon={Users}
+          label="Total Users with Roles"
+          value={roles.reduce((sum, r) => sum + (r.userCount || 0), 0) || 0}
+          color="info"
+        />
+      </div>
+
+      {/* Search and Filter */}
+      <div className="glass-effect rounded-xl p-4 border border-white/20">
+        <div className="flex flex-col sm:flex-row gap-3">
+          <div className="flex-1">
+            <Input
+              icon={Search}
+              placeholder="Search roles..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+          {/* <div className="flex gap-2">
+            <div className="flex gap-2">
+              <select
+                value={bulkAction}
+                onChange={(e) => setBulkAction(e.target.value)}
+                className="bg-white/5 rounded-lg px-3 py-2 text-sm text-white border border-white/10 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                disabled={isSubmitting}
+              >
+                <option value="">Bulk Actions</option>
+                <option value="activate">Activate</option>
+                <option value="deactivate">Deactivate</option>
+                <option value="delete">Delete</option>
+              </select>
+              <button
+                onClick={handleBulkAction}
+                disabled={!bulkAction || selectedRoles.length === 0 || isSubmitting}
+                className="px-4 py-2 bg-primary-500 rounded-lg text-white hover:bg-primary-600 transition disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Apply
+              </button>
+            </div>
+            <Button variant="outline" size="small" icon={Filter} disabled={isSubmitting}>
+              Filter
+            </Button>
+            <Button variant="outline" size="small" icon={RefreshCw} onClick={fetchRoles} disabled={isSubmitting}>
+              Refresh
+            </Button>
+          </div> */}
+        </div>
+      </div>
+
+      {/* ✅ Roles Table with Custom Columns */}
+      <AdminTable
+        columns={columns}
+        data={roles}
+        isLoading={isLoading}
+        onRowClick={handleView}
+        selectedRows={selectedRoles}
+        onSelectRows={setSelectedRoles}
+        showActions={false}
+        showView={false}
+        showEdit={false}
+        showDelete={false}
+        showCopy={false}
+        striped={true}
+        hoverable={true}
+      />
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between">
+          <p className="text-sm text-gray-400">
+            Showing {(currentPage - 1) * 20 + 1} - {Math.min(currentPage * 20, roles.length + ((currentPage - 1) * 20))} of {roles.length + ((currentPage - 1) * 20)} roles
+          </p>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+              disabled={currentPage === 1 || isSubmitting}
+              className="p-2 rounded-lg bg-white/5 hover:bg-white/10 transition disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <ChevronLeft className="w-4 h-4 text-gray-400" />
+            </button>
+            <span className="px-3 py-2 text-sm text-gray-400">
+              {currentPage} / {totalPages}
+            </span>
+            <button
+              onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+              disabled={currentPage === totalPages || isSubmitting}
+              className="p-2 rounded-lg bg-white/5 hover:bg-white/10 transition disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <ChevronRight className="w-4 h-4 text-gray-400" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Create/Edit/View Modal */}
+      <AdminModal
+        isOpen={showModal}
+        onClose={handleCloseModal}
+        title={modalType === 'create' ? 'Create Role' : modalType === 'edit' ? 'Edit Role' : 'Role Details'}
+        size="lg"
+        confirmText={modalType === 'view' ? 'Close' : 'Save'}
+        showCancel={modalType !== 'view'}
+        onConfirm={modalType === 'view' ? handleCloseModal : handleSubmit}
+        confirmVariant={modalType === 'view' ? 'outline' : 'gradient'}
+        loading={isSubmitting}
+      >
+        {modalType === 'view' && selectedRole ? (
+          <RoleDetailView 
+            role={selectedRole} 
+            onClose={handleCloseModal}
+          />
+        ) : (
+          <RoleForm
+            formData={formData}
+            formErrors={formErrors}
+            onChange={handleFormChange}
+            onPermissionChange={handlePermissionChange}
+            isEdit={modalType === 'edit'}
+            onClose={handleCloseModal}
+            isSubmitting={isSubmitting}
+          />
+        )}
+      </AdminModal>
+    </div>
+  );
+};
+
+// ============================================
+// ROLE DETAIL VIEW COMPONENT
+// ============================================
+const RoleDetailView = ({ role, onClose }) => {
+  const Icon = getRoleIcon(role.icon);
+  const permissionLabels = {
+    read: 'Read',
+    write: 'Write',
+    delete: 'Delete',
+    manage: 'Manage',
+    users: 'Users',
+    content: 'Content',
+    settings: 'Settings'
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-4">
+        <div className={`p-3 rounded-2xl`} style={{ backgroundColor: role.backgroundColor || `${role.color}20` }}>
+          <Icon className={`w-10 h-10`} style={{ color: role.color }} />
+        </div>
+        <div>
+          <h3 className="text-xl font-bold text-white">{role.name}</h3>
+          <div className="flex items-center gap-2 mt-1">
+            <span className="text-sm text-gray-400">Slug: {role.slug}</span>
+            <span className="text-xs text-gray-400">•</span>
+            <span className="text-sm text-gray-400">Level: {role.level}</span>
+            <span className="text-xs text-gray-400">•</span>
+            <span className="text-sm text-gray-400">Priority: {role.priority}</span>
+            <span className="text-xs text-gray-400">•</span>
+            <span className={`text-sm ${role.isActive ? 'text-green-400' : 'text-gray-400'}`}>
+              {role.isActive ? 'Active' : 'Inactive'}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <div className="p-4 bg-white/5 rounded-lg">
+        <p className="text-gray-300">{role.description || 'No description provided'}</p>
+      </div>
+
+      <div className="p-4 bg-white/5 rounded-lg">
+        <h4 className="text-sm font-medium text-white mb-3">Permissions</h4>
+        <div className="grid grid-cols-2 gap-2">
+          {Object.entries(permissionLabels).map(([key, label]) => (
+            <div key={key} className="flex items-center gap-2 p-2 bg-white/5 rounded-lg">
+              {role.permissions?.[key] ? (
+                <CheckCircle className="w-4 h-4 text-green-400" />
+              ) : (
+                <XCircle className="w-4 h-4 text-gray-400" />
+              )}
+              <span className="text-sm text-gray-300">{label}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="p-4 bg-white/5 rounded-lg">
+        <h4 className="text-sm font-medium text-white mb-2">Users with this role</h4>
+        <p className="text-sm text-gray-400">{role.userCount || 0} users</p>
+      </div>
+
+      <div className="flex gap-2">
+        <Button 
+          variant="outline" 
+          className="flex-1" 
+          onClick={() => { 
+            toast.info(`Viewing users with role: ${role.name}`);
+          }}
+        >
+          View Users
+        </Button>
+        <Button 
+          variant="outline" 
+          className="flex-1" 
+          onClick={onClose}
+        >
+          Close
+        </Button>
+      </div>
+    </div>
+  );
+};
+
+// ============================================
+// ROLE FORM COMPONENT
+// ============================================
+const RoleForm = ({ 
+  formData, 
+  formErrors, 
+  onChange, 
+  onPermissionChange, 
+  isEdit, 
+  onClose,
+  isSubmitting = false 
+}) => {
+  const permissionLabels = {
+    read: 'Read',
+    write: 'Write',
+    delete: 'Delete',
+    manage: 'Manage',
+    users: 'Users',
+    content: 'Content',
+    settings: 'Settings'
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <Input
+            label="Name"
+            name="name"
+            value={formData.name}
+            onChange={onChange}
+            error={formErrors.name}
+            placeholder="Enter role name"
+            required
+            disabled={isSubmitting}
+          />
+        </div>
+        <div>
+          <Input
+            label="Slug"
+            name="slug"
+            value={formData.slug}
+            onChange={onChange}
+            error={formErrors.slug}
+            placeholder="Enter role slug"
+            required
+            disabled={isSubmitting}
+          />
+        </div>
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-300 mb-1.5">
+          Description
+        </label>
+        <textarea
+          name="description"
+          value={formData.description}
+          onChange={onChange}
+          rows="2"
+          className="w-full bg-white/5 rounded-lg px-4 py-2.5 text-white placeholder-gray-400 border border-white/10 focus:outline-none focus:ring-2 focus:ring-primary-500"
+          placeholder="Describe the role..."
+          disabled={isSubmitting}
+        />
+      </div>
+
+      <div className="grid grid-cols-3 gap-4">
+        <div>
+          <label className="block text-sm font-medium text-gray-300 mb-1.5">
+            Level
+          </label>
+          <input
+            type="number"
+            name="level"
+            value={formData.level}
+            onChange={onChange}
+            min="0"
+            max="100"
+            className="w-full bg-white/5 rounded-lg px-4 py-2.5 text-white border border-white/10 focus:outline-none focus:ring-2 focus:ring-primary-500"
+            disabled={isSubmitting}
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-300 mb-1.5">
+            Priority
+          </label>
+          <input
+            type="number"
+            name="priority"
+            value={formData.priority}
+            onChange={onChange}
+            min="0"
+            className="w-full bg-white/5 rounded-lg px-4 py-2.5 text-white border border-white/10 focus:outline-none focus:ring-2 focus:ring-primary-500"
+            disabled={isSubmitting}
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-300 mb-1.5">
+            Color
+          </label>
+          <div className="flex gap-2">
+            <input
+              type="color"
+              name="color"
+              value={formData.color}
+              onChange={onChange}
+              className="w-12 h-12 rounded-lg cursor-pointer bg-transparent border border-white/10"
+              disabled={isSubmitting}
+            />
+            <input
+              type="text"
+              name="color"
+              value={formData.color}
+              onChange={onChange}
+              className="flex-1 bg-white/5 rounded-lg px-4 py-2.5 text-white border border-white/10 focus:outline-none focus:ring-2 focus:ring-primary-500"
+              disabled={isSubmitting}
+            />
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-300 mb-1.5">
+          Icon
+        </label>
+        <select
+          name="icon"
+          value={formData.icon}
+          onChange={onChange}
+          className="w-full bg-white/5 rounded-lg px-4 py-2.5 text-white border border-white/10 focus:outline-none focus:ring-2 focus:ring-primary-500"
+          disabled={isSubmitting}
+        >
+          <option value="Shield">Shield</option>
+          <option value="Crown">Crown</option>
+          <option value="UserCog">UserCog</option>
+          <option value="User">User</option>
+          <option value="Users">Users</option>
+        </select>
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-300 mb-2">
+          Permissions
+        </label>
+        <div className="grid grid-cols-2 gap-2">
+          {Object.entries(permissionLabels).map(([key, label]) => (
+            <label key={key} className="flex items-center gap-2 p-2 bg-white/5 rounded-lg cursor-pointer">
+              <input
+                type="checkbox"
+                checked={formData.permissions[key] || false}
+                onChange={() => onPermissionChange(key)}
+                className="w-4 h-4 bg-white/5 border border-white/20 rounded focus:ring-primary-500"
+                disabled={isSubmitting}
+              />
+              <span className="text-sm text-gray-300">{label}</span>
+            </label>
+          ))}
+        </div>
+      </div>
+
+      <div className="flex items-center gap-4">
+        <label className="flex items-center gap-2 cursor-pointer">
+          <input
+            type="checkbox"
+            name="isActive"
+            checked={formData.isActive}
+            onChange={onChange}
+            className="w-4 h-4 bg-white/5 border border-white/20 rounded focus:ring-primary-500"
+            disabled={isSubmitting}
+          />
+          <span className="text-sm text-gray-300">Active</span>
+        </label>
+        <label className="flex items-center gap-2 cursor-pointer">
+          <input
+            type="checkbox"
+            name="isDefault"
+            checked={formData.isDefault}
+            onChange={onChange}
+            className="w-4 h-4 bg-white/5 border border-white/20 rounded focus:ring-primary-500"
+            disabled={isSubmitting}
+          />
+          <span className="text-sm text-gray-300">Default Role</span>
+        </label>
+      </div>
+
+      <div className="flex gap-2 pt-2">
+        <Button 
+          type="submit" 
+          variant="gradient" 
+          className="flex-1"
+          loading={isSubmitting}
+          disabled={isSubmitting}
+        >
+          {isEdit ? 'Update Role' : 'Create Role'}
+        </Button>
+        <Button 
+          type="button" 
+          variant="outline" 
+          className="flex-1" 
+          onClick={onClose}
+          disabled={isSubmitting}
+        >
+          Cancel
+        </Button>
+      </div>
+    </div>
+  );
+};
+
+// ============================================
+// HELPER FUNCTIONS
+// ============================================
+const getRoleIcon = (iconName) => {
+  const icons = {
+    Shield, Crown, UserCog, User, Users
+  };
+  return icons[iconName] || Shield;
+};
+
+// ============================================
+// LOADING SKELETON
+// ============================================
+const AdminLoadingSkeleton = () => (
+  <div className="space-y-6 animate-pulse">
+    <div className="flex items-center justify-between">
+      <div>
+        <div className="h-8 w-48 bg-white/5 rounded"></div>
+        <div className="h-4 w-64 bg-white/5 rounded mt-2"></div>
+      </div>
+      <div className="h-10 w-32 bg-white/5 rounded"></div>
+    </div>
+    <div className="grid grid-cols-4 gap-4">
+      {[1, 2, 3, 4].map(i => (
+        <div key={i} className="h-32 bg-white/5 rounded-xl"></div>
+      ))}
+    </div>
+    <div className="h-16 bg-white/5 rounded-xl"></div>
+    <div className="h-96 bg-white/5 rounded-xl"></div>
+  </div>
+);
+
+export default AdminRoles;

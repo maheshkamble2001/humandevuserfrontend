@@ -1,6 +1,9 @@
 // src/components/admin/AdminSidebar.jsx
+// src/components/admin/AdminSidebar.jsx
 import React from 'react';
 import { NavLink } from 'react-router-dom';
+
+// Main Icons
 import {
   LayoutDashboard,
   Users,
@@ -20,15 +23,57 @@ import {
   Zap,
   Gift,
   Calendar,
+  CalendarDays,
   MessageCircle,
   Database,
   Cloud,
   Server,
   Lock,
-  Eye,
-  EyeOff,
+  UserCog,
+  User,
 } from 'lucide-react';
 
+// Small Data Icons
+import {
+  FolderOpen,
+  Diamond,
+  Briefcase,
+  Globe,
+  Clock,
+  Palette,
+  Languages,
+} from 'lucide-react';
+
+// Action Icons
+import {
+  Plus,
+  Edit2,
+  Trash2,
+  Eye,
+  Save,
+  X,
+  Search,
+  Filter,
+  RefreshCw,
+  ChevronLeft,
+  ChevronRight,
+  MoreVertical,
+  Copy,
+  CheckCircle,
+  XCircle,
+  AlertCircle,
+  Loader,
+  Unlock,
+  Ban,
+  UserPlus,
+  UserMinus,
+  UserCheck,
+  UserX,
+  Play,
+  Pause,
+} from 'lucide-react';
+
+// ... rest of the component
 const AdminSidebar = ({ isOpen, onClose }) => {
   const menuItems = [
     {
@@ -47,17 +92,28 @@ const AdminSidebar = ({ isOpen, onClose }) => {
       items: [
         { icon: BarChart3, label: 'Analytics', path: '/admin/analytics' },
         { icon: TrendingUp, label: 'Reports', path: '/admin/reports' },
-        { icon: Users, label: 'User Activity', path: '/admin/activity' },
       ]
     },
     {
-      section: 'Content',
+      section: 'Management',
       items: [
-        { icon: Crown, label: 'Badges', path: '/admin/badges' },
-        { icon: Star, label: 'Titles', path: '/admin/titles' },
+        { icon: Shield, label: 'Roles', path: '/admin/roles' },
+        { icon: Lock, label: 'Permissions', path: '/admin/permissions' },
+        { icon: FolderOpen, label: 'Categories', path: '/admin/categories' },
+        { icon: Target, label: 'Difficulties', path: '/admin/difficulties' },
+        { icon: Diamond, label: 'Rarities', path: '/admin/rarities' },
+        { icon: Activity, label: 'Statuses', path: '/admin/statuses' },
+        { icon: Crown, label: 'Ranks', path: '/admin/ranks' },
+        { icon: Briefcase, label: 'Career Paths', path: '/admin/career-paths' },
+        { icon: Star, label: 'Badges', path: '/admin/badges' },
         { icon: Gift, label: 'Rewards', path: '/admin/rewards' },
-        { icon: Calendar, label: 'Events', path: '/admin/events' },
-        { icon: MessageCircle, label: 'Announcements', path: '/admin/announcements' },
+        { icon: Bell, label: 'Notification Types', path: '/admin/notification-types' },
+        { icon: CalendarDays, label: 'Mission Types', path: '/admin/mission-types' },
+        { icon: Gamepad2, label: 'Challenge Types', path: '/admin/challenge-types' },
+        { icon: Globe, label: 'Countries', path: '/admin/countries' },
+        { icon: Clock, label: 'Timezones', path: '/admin/timezones' },
+        { icon: Palette, label: 'Themes', path: '/admin/themes' },
+        { icon: Languages, label: 'Languages', path: '/admin/languages' },
       ]
     },
     {

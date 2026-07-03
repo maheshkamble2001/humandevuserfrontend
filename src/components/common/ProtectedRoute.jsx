@@ -4,7 +4,7 @@ import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 
 export const ProtectedRoute = ({ children, requiredRole, requiredPermission }) => {
-  const { user, loading, isAuthenticated, hasPermission, getUserRole } = useAuth();
+  const { user, loading, isAuthenticated, hasPermission, getUserRole, isAdmin } = useAuth();
   const location = useLocation();
 
   if (loading) {
@@ -22,9 +22,17 @@ export const ProtectedRoute = ({ children, requiredRole, requiredPermission }) =
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  // Check role requirements
-  if (requiredRole && getUserRole() !== requiredRole && getUserRole() !== 'admin') {
-    return <Navigate to="/" replace />;
+  // ✅ Check role requirements - Admin has access to everything
+  if (requiredRole) {
+    const userRole = getUserRole();
+    // Admin can access any route
+    if (userRole === 'admin') {
+      return children;
+    }
+    // Check if user has required role
+    if (userRole !== requiredRole) {
+      return <Navigate to="/" replace />;
+    }
   }
 
   // Check permission requirements

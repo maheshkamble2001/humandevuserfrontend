@@ -103,7 +103,12 @@ const Register = () => {
     
     const result = await registerUser(userData);
     if (result.success) {
-      navigate('/');
+      // 🔥 Role-based redirect
+      if (result.user?.role === 'admin') {
+        navigate('/admin');
+      } else {
+        navigate('/');
+      }
     } else {
       setError(result.error);
     }
