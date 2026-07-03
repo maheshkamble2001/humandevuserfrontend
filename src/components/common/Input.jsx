@@ -1,5 +1,6 @@
 // src/components/common/Input.jsx
-import React, { forwardRef } from 'react';
+import React, { forwardRef, useState } from 'react';
+import { Eye, EyeOff } from 'lucide-react';
 
 const Input = forwardRef(({
   label,
@@ -10,10 +11,27 @@ const Input = forwardRef(({
   iconPosition = 'left',
   helperText,
   required,
+  disabled,
+  type = 'text',
+  size = 'medium',
+  fullWidth = true,
   ...props
 }, ref) => {
+  const [showPassword, setShowPassword] = useState(false);
+  const isPassword = type === 'password';
+  const inputType = isPassword ? (showPassword ? 'text' : 'password') : type;
+
+  const sizes = {
+    small: 'px-3 py-1.5 text-sm',
+    medium: 'px-4 py-2.5 text-base',
+    large: 'px-5 py-3 text-lg',
+  };
+
+  const hasLeftIcon = Icon && iconPosition === 'left';
+  const hasRightIcon = RightIcon || (isPassword) || (Icon && iconPosition === 'right');
+
   return (
-    <div className={`w-full ${className}`}>
+    <div className={`${fullWidth ? 'w-full' : ''} ${className}`}>
       {label && (
         <label className="block text-sm font-medium text-gray-300 mb-1.5">
           {label}
@@ -21,39 +39,44 @@ const Input = forwardRef(({
         </label>
       )}
       <div className="relative">
-        {/* Left Icon */}
-        {Icon && iconPosition === 'left' && (
-          <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">
+        {hasLeftIcon && (
+          <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none">
             <Icon className="w-4 h-4" />
           </div>
         )}
         
         <input
           ref={ref}
+          type={inputType}
+          disabled={disabled}
           className={`
-            w-full bg-white/5 border rounded-lg px-4 py-2.5
+            ${sizes[size]}
+            ${hasLeftIcon ? 'pl-10' : ''}
+            ${hasRightIcon ? 'pr-10' : ''}
+            w-full bg-white/5 border rounded-lg
             text-white placeholder-gray-400
             focus:outline-none focus:ring-2 focus:ring-primary-500
             transition duration-200
-            ${Icon && iconPosition === 'left' ? 'pl-10' : ''}
-            ${(RightIcon || (Icon && iconPosition === 'right')) ? 'pr-10' : ''}
-            ${error ? 'border-red-500 focus:ring-red-500' : 'border-white/10'}
+            ${error ? 'border-red-500 focus:ring-red-500' : 'border-white/10 focus:border-primary-500'}
+            ${disabled ? 'opacity-50 cursor-not-allowed' : ''}
           `}
           {...props}
         />
         
-        {/* Right Icon */}
-        {RightIcon && (
+        {hasRightIcon && !isPassword && RightIcon && (
           <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
             {RightIcon}
           </div>
         )}
         
-        {/* Right Icon from icon prop */}
-        {Icon && iconPosition === 'right' && !RightIcon && (
-          <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400">
-            <Icon className="w-4 h-4" />
-          </div>
+        {isPassword && (
+          <button
+            type="button"
+            onClick={() => setShowPassword(!showPassword)}
+            className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-white transition"
+          >
+            {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+          </button>
         )}
       </div>
       
