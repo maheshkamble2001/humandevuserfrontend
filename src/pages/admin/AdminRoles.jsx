@@ -1,6 +1,6 @@
 // src/pages/admin/AdminRoles.jsx
 import React, { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
   Shield,
   Plus,
@@ -45,7 +45,6 @@ import {
   ShieldCheck,
   ShieldAlert,
   ShieldQuestion,
-  // ✅ Add custom icons for rendering
   BadgeCheck,
   UserCog as UserCogIcon,
   CheckCircle as CheckCircleIcon,
@@ -74,6 +73,12 @@ const AdminRoles = () => {
   const [bulkAction, setBulkAction] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showActionsMenu, setShowActionsMenu] = useState(null);
+  
+  // ✅ Delete Confirmation Modal State
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deleteType, setDeleteType] = useState('single'); // 'single' or 'bulk'
+  const [confirmText, setConfirmText] = useState('');
 
   // Form state
   const [formData, setFormData] = useState({
@@ -134,6 +139,120 @@ const AdminRoles = () => {
   };
 
   // ============================================
+  // DELETE CONFIRMATION HANDLERS
+  // ============================================
+  
+  const openDeleteConfirmation = (role) => {
+    setDeleteTarget(role);
+    setDeleteType('single');
+    setConfirmText('');
+    setShowDeleteModal(true);
+    setShowActionsMenu(null);
+  };
+
+  const openBulkDeleteConfirmation = () => {
+    setDeleteTarget(selectedRoles);
+    setDeleteType('bulk');
+    setConfirmText('');
+    setShowDeleteModal(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    try {
+      setIsSubmitting(true);
+      
+      if (deleteType === 'single' && deleteTarget) {
+        await roleService.deleteRole(deleteTarget.id);
+        toast.success(`Role "${deleteTarget.name}" deleted successfully`);
+      } else if (deleteType === 'bulk' && Array.isArray(deleteTarget)) {
+        await roleService.bulkUpdateRoles({
+          roleIds: deleteTarget,
+          action: 'delete'
+        });
+        toast.success(`Successfully deleted ${deleteTarget.length} roles`);
+        setSelectedRoles([]);
+        setBulkAction('');
+      }
+      
+      setShowDeleteModal(false);
+      setDeleteTarget(null);
+      setConfirmText('');
+      await fetchRoles();
+    } catch (error) {
+      console.error('Error deleting role(s):', error);
+      toast.error(error.message || 'Failed to delete role(s)');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleDeleteClick = (role) => {
+    // Check if it's a critical role
+    if (role.slug === 'admin' || role.slug === 'user') {
+      toast.warning(`Cannot delete the "${role.name}" role as it's a system role.`);
+      return;
+    }
+    
+    if (role.isDefault) {
+      toast.warning(`Cannot delete the "${role.name}" role as it's the default role.`);
+      return;
+    }
+    
+    openDeleteConfirmation(role);
+  };
+
+  // ============================================
+  // BULK ACTION HANDLER (Modified)
+  // ============================================
+  const handleBulkAction = async () => {
+    if (!bulkAction || selectedRoles.length === 0) return;
+
+    if (bulkAction === 'delete') {
+      // Check if any selected roles are critical
+      const criticalRoles = roles.filter(r => 
+        selectedRoles.includes(r.id) && (r.slug === 'admin' || r.slug === 'user' || r.isDefault)
+      );
+      
+      if (criticalRoles.length > 0) {
+        toast.warning(`Cannot delete system roles: ${criticalRoles.map(r => r.name).join(', ')}`);
+        const nonCriticalIds = selectedRoles.filter(id => 
+          !criticalRoles.some(cr => cr.id === id)
+        );
+        
+        if (nonCriticalIds.length === 0) return;
+        
+        setSelectedRoles(nonCriticalIds);
+        if (nonCriticalIds.length > 0) {
+          openBulkDeleteConfirmation();
+        }
+        return;
+      }
+      
+      openBulkDeleteConfirmation();
+      return;
+    }
+
+    if (!window.confirm(`Are you sure you want to perform "${bulkAction}" on ${selectedRoles.length} roles?`)) return;
+
+    try {
+      setIsSubmitting(true);
+      await roleService.bulkUpdateRoles({
+        roleIds: selectedRoles,
+        action: bulkAction
+      });
+      toast.success(`Successfully performed ${bulkAction} on ${selectedRoles.length} roles`);
+      setSelectedRoles([]);
+      setBulkAction('');
+      await fetchRoles();
+    } catch (error) {
+      console.error('Error performing bulk action:', error);
+      toast.error(error.message || 'Failed to perform bulk action');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // ============================================
   // ACTION HANDLERS
   // ============================================
 
@@ -171,23 +290,6 @@ const AdminRoles = () => {
     setModalType('edit');
     setShowModal(true);
     setShowActionsMenu(null);
-  };
-
-  const handleDelete = async (role) => {
-    setShowActionsMenu(null);
-    if (!window.confirm(`Are you sure you want to delete role "${role.name}"? This action cannot be undone.`)) return;
-
-    try {
-      setIsSubmitting(true);
-      await roleService.deleteRole(role.id);
-      toast.success('Role deleted successfully');
-      await fetchRoles();
-    } catch (error) {
-      console.error('Error deleting role:', error);
-      toast.error(error.message || 'Failed to delete role');
-    } finally {
-      setIsSubmitting(false);
-    }
   };
 
   const handleDuplicate = async (role) => {
@@ -258,32 +360,6 @@ const AdminRoles = () => {
     setShowActionsMenu(null);
     navigator.clipboard.writeText(role.id);
     toast.success('Role ID copied to clipboard!');
-  };
-
-  // ============================================
-  // BULK ACTIONS
-  // ============================================
-  const handleBulkAction = async () => {
-    if (!bulkAction || selectedRoles.length === 0) return;
-
-    if (!window.confirm(`Are you sure you want to perform "${bulkAction}" on ${selectedRoles.length} roles?`)) return;
-
-    try {
-      setIsSubmitting(true);
-      await roleService.bulkUpdateRoles({
-        roleIds: selectedRoles,
-        action: bulkAction
-      });
-      toast.success(`Successfully performed ${bulkAction} on ${selectedRoles.length} roles`);
-      setSelectedRoles([]);
-      setBulkAction('');
-      await fetchRoles();
-    } catch (error) {
-      console.error('Error performing bulk action:', error);
-      toast.error(error.message || 'Failed to perform bulk action');
-    } finally {
-      setIsSubmitting(false);
-    }
   };
 
   // ============================================
@@ -387,15 +463,13 @@ const AdminRoles = () => {
   };
 
   // ============================================
-  // ✅ CUSTOM COLUMNS WITH CUSTOM RENDERERS
+  // TABLE COLUMNS
   // ============================================
   const columns = [
     { 
       key: 'name', 
       label: 'Role Name', 
       sortable: true,
-      type: 'custom',
-      // ✅ Custom renderer for Name column with icon
       render: (value, row) => {
         const Icon = getRoleIcon(row.icon);
         return (
@@ -418,8 +492,6 @@ const AdminRoles = () => {
       key: 'level', 
       label: 'Level', 
       sortable: true,
-      type: 'badge',
-      // ✅ Custom renderer for Level
       render: (value) => (
         <div className="flex items-center gap-1.5">
           <ShieldCheck className="w-4 h-4 text-primary-400" />
@@ -431,26 +503,20 @@ const AdminRoles = () => {
       key: 'priority', 
       label: 'Priority', 
       sortable: true,
-      type: 'badge',
-      // ✅ Custom renderer for Priority
       render: (value) => (
-        <div className="flex items-center gap-1.5">
-          <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-            value >= 3 ? 'bg-green-500/20 text-green-400' :
-            value >= 2 ? 'bg-yellow-500/20 text-yellow-400' :
-            'bg-gray-500/20 text-gray-400'
-          }`}>
-            {value}
-          </span>
-        </div>
+        <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+          value >= 3 ? 'bg-green-500/20 text-green-400' :
+          value >= 2 ? 'bg-yellow-500/20 text-yellow-400' :
+          'bg-gray-500/20 text-gray-400'
+        }`}>
+          {value}
+        </span>
       )
     },
     { 
       key: 'users', 
       label: 'Users', 
       sortable: true,
-      type: 'badge',
-      // ✅ Custom renderer for Users count
       render: (value) => (
         <div className="flex items-center gap-1.5">
           <Users className="w-4 h-4 text-blue-400" />
@@ -463,8 +529,6 @@ const AdminRoles = () => {
       key: 'isDefault', 
       label: 'Default', 
       sortable: true,
-      type: 'boolean',
-      // ✅ Custom renderer for Default status
       render: (value) => (
         <div className="flex items-center gap-1.5">
           {value ? (
@@ -485,8 +549,6 @@ const AdminRoles = () => {
       key: 'isActive', 
       label: 'Active', 
       sortable: true,
-      type: 'status',
-      // ✅ Custom renderer for Active status
       render: (value) => (
         <div className="flex items-center gap-1.5">
           {value ? (
@@ -507,15 +569,10 @@ const AdminRoles = () => {
       key: 'actions', 
       label: 'Actions', 
       sortable: false,
-      // ✅ Actions column with all actions
       render: (value, row) => (
         <div className="flex items-center gap-1.5">
-          {/* View Button */}
           <button
-            onClick={(e) => {
-              e.stopPropagation();
-              handleView(row);
-            }}
+            onClick={(e) => { e.stopPropagation(); handleView(row); }}
             className="p-1.5 hover:bg-white/10 rounded-lg transition group"
             title="View Role"
             disabled={isSubmitting}
@@ -523,12 +580,8 @@ const AdminRoles = () => {
             <EyeIcon className="w-4 h-4 text-gray-400 group-hover:text-white transition" />
           </button>
 
-          {/* Edit Button */}
           <button
-            onClick={(e) => {
-              e.stopPropagation();
-              handleEdit(row);
-            }}
+            onClick={(e) => { e.stopPropagation(); handleEdit(row); }}
             className="p-1.5 hover:bg-white/10 rounded-lg transition group"
             title="Edit Role"
             disabled={isSubmitting}
@@ -536,11 +589,11 @@ const AdminRoles = () => {
             <Pencil className="w-4 h-4 text-blue-400 group-hover:text-blue-300 transition" />
           </button>
 
-          {/* Delete Button */}
+          {/* ✅ Delete Button with Confirmation */}
           <button
-            onClick={(e) => {
-              e.stopPropagation();
-              handleDelete(row);
+            onClick={(e) => { 
+              e.stopPropagation(); 
+              handleDeleteClick(row);
             }}
             className="p-1.5 hover:bg-white/10 rounded-lg transition group"
             title="Delete Role"
@@ -549,107 +602,7 @@ const AdminRoles = () => {
             <TrashIcon className="w-4 h-4 text-red-400 group-hover:text-red-300 transition" />
           </button>
 
-          {/* More Actions Dropdown */}
-          <div className="relative">
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                setShowActionsMenu(showActionsMenu === row.id ? null : row.id);
-              }}
-              className="p-1.5 hover:bg-white/10 rounded-lg transition group"
-              title="More Actions"
-              disabled={isSubmitting}
-            >
-              <MoreHorizontal className="w-4 h-4 text-gray-400 group-hover:text-white transition" />
-            </button>
-
-            {/* Dropdown Menu */}
-            {showActionsMenu === row.id && (
-              <div className="absolute right-0 mt-1 w-48 bg-dark-800 rounded-lg shadow-xl border border-white/10 overflow-hidden z-50">
-                <div className="py-1">
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleDuplicate(row);
-                    }}
-                    className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-300 hover:bg-white/5 transition"
-                  >
-                    <CopyIcon className="w-4 h-4" />
-                    Duplicate Role
-                  </button>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleToggleActive(row);
-                    }}
-                    className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-300 hover:bg-white/5 transition"
-                  >
-                    {row.isActive ? (
-                      <>
-                        <Ban className="w-4 h-4 text-yellow-400" />
-                        Deactivate
-                      </>
-                    ) : (
-                      <>
-                        <CheckCircle className="w-4 h-4 text-green-400" />
-                        Activate
-                      </>
-                    )}
-                  </button>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleToggleDefault(row);
-                    }}
-                    className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-300 hover:bg-white/5 transition"
-                  >
-                    {row.isDefault ? (
-                      <>
-                        <StarOff className="w-4 h-4 text-yellow-400" />
-                        Remove Default
-                      </>
-                    ) : (
-                      <>
-                        <Star className="w-4 h-4 text-yellow-400" />
-                        Set as Default
-                      </>
-                    )}
-                  </button>
-                  <div className="border-t border-white/10 my-1"></div>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleViewUsers(row);
-                    }}
-                    className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-300 hover:bg-white/5 transition"
-                  >
-                    <Users className="w-4 h-4" />
-                    View Users
-                  </button>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleCopyName(row);
-                    }}
-                    className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-300 hover:bg-white/5 transition"
-                  >
-                    <CopyIcon className="w-4 h-4" />
-                    Copy Name
-                  </button>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleCopyId(row);
-                    }}
-                    className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-300 hover:bg-white/5 transition"
-                  >
-                    <CopyIcon className="w-4 h-4" />
-                    Copy ID
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
+         
         </div>
       )
     },
@@ -752,34 +705,7 @@ const AdminRoles = () => {
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
-          {/* <div className="flex gap-2">
-            <div className="flex gap-2">
-              <select
-                value={bulkAction}
-                onChange={(e) => setBulkAction(e.target.value)}
-                className="bg-white/5 rounded-lg px-3 py-2 text-sm text-white border border-white/10 focus:outline-none focus:ring-2 focus:ring-primary-500"
-                disabled={isSubmitting}
-              >
-                <option value="">Bulk Actions</option>
-                <option value="activate">Activate</option>
-                <option value="deactivate">Deactivate</option>
-                <option value="delete">Delete</option>
-              </select>
-              <button
-                onClick={handleBulkAction}
-                disabled={!bulkAction || selectedRoles.length === 0 || isSubmitting}
-                className="px-4 py-2 bg-primary-500 rounded-lg text-white hover:bg-primary-600 transition disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Apply
-              </button>
-            </div>
-            <Button variant="outline" size="small" icon={Filter} disabled={isSubmitting}>
-              Filter
-            </Button>
-            <Button variant="outline" size="small" icon={RefreshCw} onClick={fetchRoles} disabled={isSubmitting}>
-              Refresh
-            </Button>
-          </div> */}
+          
         </div>
       </div>
 
@@ -857,7 +783,165 @@ const AdminRoles = () => {
           />
         )}
       </AdminModal>
+
+      {/* ✅ Delete Confirmation Modal */}
+      <AnimatePresence>
+        {showDeleteModal && (
+          <DeleteConfirmationModal
+            isOpen={showDeleteModal}
+            onClose={() => {
+              setShowDeleteModal(false);
+              setDeleteTarget(null);
+              setConfirmText('');
+            }}
+            onConfirm={handleConfirmDelete}
+            target={deleteTarget}
+            type={deleteType}
+            isSubmitting={isSubmitting}
+            confirmText={confirmText}
+            setConfirmText={setConfirmText}
+          />
+        )}
+      </AnimatePresence>
     </div>
+  );
+};
+
+// ============================================
+// DELETE CONFIRMATION MODAL
+// ============================================
+const DeleteConfirmationModal = ({
+  isOpen,
+  onClose,
+  onConfirm,
+  target,
+  type,
+  isSubmitting,
+  confirmText,
+  setConfirmText,
+}) => {
+  const isSingleDelete = type === 'single';
+  const targetName = isSingleDelete ? target?.name : `${target?.length || 0} roles`;
+  const isDangerous = isSingleDelete && (target?.slug === 'admin' || target?.slug === 'user' || target?.isDefault);
+  
+  const isConfirmEnabled = isSingleDelete 
+    ? confirmText === target?.name 
+    : confirmText === 'DELETE';
+
+  if (isDangerous) {
+    return (
+      <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+        <div className="bg-dark-800 rounded-xl max-w-md w-full border border-red-500/20 p-6">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="p-2 bg-red-500/20 rounded-full">
+              <Shield className="w-6 h-6 text-red-400" />
+            </div>
+            <h3 className="text-xl font-bold text-white">Cannot Delete System Role</h3>
+          </div>
+          <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-lg mb-4">
+            <p className="text-red-400">
+              <strong>"{target?.name}"</strong> is a system role and cannot be deleted.
+            </p>
+            <p className="text-sm text-gray-400 mt-2">
+              System roles are required for the platform to function properly.
+            </p>
+          </div>
+          <Button variant="gradient" className="w-full" onClick={onClose}>
+            Got it
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4"
+      onClick={onClose}
+    >
+      <motion.div
+        initial={{ scale: 0.9, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        exit={{ scale: 0.9, opacity: 0 }}
+        className="bg-dark-800 rounded-xl max-w-md w-full border border-red-500/20"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="p-6">
+          {/* Header */}
+          <div className="flex items-start gap-3 mb-4">
+            <div className="p-2 bg-red-500/20 rounded-full flex-shrink-0">
+              <AlertTriangle className="w-6 h-6 text-red-400" />
+            </div>
+            <div>
+              <h3 className="text-xl font-bold text-white">
+                {isSingleDelete ? 'Delete Role' : 'Delete Multiple Roles'}
+              </h3>
+              <p className="text-sm text-gray-400 mt-1">
+                {isSingleDelete 
+                  ? `You are about to delete the role "${target?.name}".`
+                  : `You are about to delete ${target?.length || 0} roles.`
+                }
+              </p>
+            </div>
+          </div>
+
+          {/* Warning */}
+          <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-lg mb-4">
+            <p className="text-sm text-red-400">
+              <strong>Warning:</strong> This action cannot be undone. All users with this role will lose their permissions.
+            </p>
+            {isSingleDelete && target?.userCount > 0 && (
+              <p className="text-sm text-yellow-400 mt-2">
+                ⚠️ This role is currently assigned to {target.userCount} user{target.userCount > 1 ? 's' : ''}.
+              </p>
+            )}
+          </div>
+
+          {/* Confirmation Input */}
+          <div className="mb-4">
+            <p className="text-sm text-gray-300 mb-2">
+              {isSingleDelete ? (
+                <>Type <strong className="text-red-400">{target?.name}</strong> to confirm:</>
+              ) : (
+                <>Type <strong className="text-red-400">DELETE</strong> to confirm:</>
+              )}
+            </p>
+            <input
+              type="text"
+              value={confirmText}
+              onChange={(e) => setConfirmText(e.target.value)}
+              placeholder={isSingleDelete ? `Type "${target?.name}"` : 'Type "DELETE"'}
+              className="w-full bg-white/5 rounded-lg px-4 py-2.5 text-white placeholder-gray-400 border border-white/10 focus:outline-none focus:ring-2 focus:ring-red-500"
+              autoFocus
+            />
+          </div>
+
+          {/* Actions */}
+          <div className="flex gap-3">
+            <Button
+              variant="danger"
+              className="flex-1"
+              onClick={onConfirm}
+              loading={isSubmitting}
+              disabled={!isConfirmEnabled || isSubmitting}
+            >
+              {isSingleDelete ? 'Delete Role' : 'Delete Roles'}
+            </Button>
+            <Button
+              variant="outline"
+              className="flex-1"
+              onClick={onClose}
+              disabled={isSubmitting}
+            >
+              Cancel
+            </Button>
+          </div>
+        </div>
+      </motion.div>
+    </motion.div>
   );
 };
 
@@ -923,24 +1007,7 @@ const RoleDetailView = ({ role, onClose }) => {
         <p className="text-sm text-gray-400">{role.userCount || 0} users</p>
       </div>
 
-      <div className="flex gap-2">
-        <Button 
-          variant="outline" 
-          className="flex-1" 
-          onClick={() => { 
-            toast.info(`Viewing users with role: ${role.name}`);
-          }}
-        >
-          View Users
-        </Button>
-        <Button 
-          variant="outline" 
-          className="flex-1" 
-          onClick={onClose}
-        >
-          Close
-        </Button>
-      </div>
+      
     </div>
   );
 };
@@ -1128,27 +1195,6 @@ const RoleForm = ({
           />
           <span className="text-sm text-gray-300">Default Role</span>
         </label>
-      </div>
-
-      <div className="flex gap-2 pt-2">
-        <Button 
-          type="submit" 
-          variant="gradient" 
-          className="flex-1"
-          loading={isSubmitting}
-          disabled={isSubmitting}
-        >
-          {isEdit ? 'Update Role' : 'Create Role'}
-        </Button>
-        <Button 
-          type="button" 
-          variant="outline" 
-          className="flex-1" 
-          onClick={onClose}
-          disabled={isSubmitting}
-        >
-          Cancel
-        </Button>
       </div>
     </div>
   );
