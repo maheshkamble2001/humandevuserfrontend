@@ -74,10 +74,10 @@ const AdminRoles = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showActionsMenu, setShowActionsMenu] = useState(null);
   
-  // ✅ Delete Confirmation Modal State
+  // Delete Confirmation Modal State
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null);
-  const [deleteType, setDeleteType] = useState('single'); // 'single' or 'bulk'
+  const [deleteType, setDeleteType] = useState('single');
   const [confirmText, setConfirmText] = useState('');
 
   // Form state
@@ -187,7 +187,6 @@ const AdminRoles = () => {
   };
 
   const handleDeleteClick = (role) => {
-    // Check if it's a critical role
     if (role.slug === 'admin' || role.slug === 'user') {
       toast.warning(`Cannot delete the "${role.name}" role as it's a system role.`);
       return;
@@ -202,13 +201,12 @@ const AdminRoles = () => {
   };
 
   // ============================================
-  // BULK ACTION HANDLER (Modified)
+  // BULK ACTION HANDLER
   // ============================================
   const handleBulkAction = async () => {
     if (!bulkAction || selectedRoles.length === 0) return;
 
     if (bulkAction === 'delete') {
-      // Check if any selected roles are critical
       const criticalRoles = roles.filter(r => 
         selectedRoles.includes(r.id) && (r.slug === 'admin' || r.slug === 'user' || r.isDefault)
       );
@@ -249,6 +247,26 @@ const AdminRoles = () => {
       toast.error(error.message || 'Failed to perform bulk action');
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  // ============================================
+  // TOGGLE ACTIVE STATUS HANDLER
+  // ============================================
+  const handleToggleActive = async (role) => {
+    console.log(role)
+    setShowActionsMenu(null);
+    try {
+      const newStatus = !role.isActive;
+      await roleService.updateRole(role.id, { 
+        ...role, 
+        isActive: newStatus 
+      });
+      toast.success(`Role "${role.name}" ${newStatus ? 'activated' : 'deactivated'} successfully`);
+      // await fetchRoles();
+    } catch (error) {
+      console.error('Error toggling role status:', error);
+      toast.error(error.message || 'Failed to toggle role status');
     }
   };
 
@@ -312,21 +330,6 @@ const AdminRoles = () => {
     } catch (error) {
       console.error('Error duplicating role:', error);
       toast.error(error.message || 'Failed to duplicate role');
-    }
-  };
-
-  const handleToggleActive = async (role) => {
-    setShowActionsMenu(null);
-    try {
-      await roleService.updateRole(role.id, { 
-        ...role, 
-        isActive: !role.isActive 
-      });
-      toast.success(`Role ${role.isActive ? 'deactivated' : 'activated'} successfully`);
-      await fetchRoles();
-    } catch (error) {
-      console.error('Error toggling role status:', error);
-      toast.error(error.message || 'Failed to toggle role status');
     }
   };
 
@@ -463,7 +466,7 @@ const AdminRoles = () => {
   };
 
   // ============================================
-  // TABLE COLUMNS
+  // TABLE COLUMNS WITH TOGGLE BUTTON
   // ============================================
   const columns = [
     { 
@@ -549,19 +552,47 @@ const AdminRoles = () => {
       key: 'isActive', 
       label: 'Active', 
       sortable: true,
-      render: (value) => (
-        <div className="flex items-center gap-1.5">
-          {value ? (
-            <>
-              <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
-              <span className="text-xs text-green-400 font-medium">Active</span>
-            </>
-          ) : (
-            <>
-              <div className="w-2 h-2 bg-gray-500 rounded-full" />
-              <span className="text-xs text-gray-500">Inactive</span>
-            </>
-          )}
+      render: (value, row) => (
+        <div className="flex items-center gap-3">
+          {/* Status Indicator */}
+          <div className="flex items-center gap-1.5">
+            {value ? (
+              <>
+                <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
+                <span className="text-xs text-green-400 font-medium">Active</span>
+              </>
+            ) : (
+              <>
+                <div className="w-2 h-2 bg-gray-500 rounded-full" />
+                <span className="text-xs text-gray-500">Inactive</span>
+              </>
+            )}
+          </div>
+          
+          {/* Toggle Switch */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              handleToggleActive(row);
+            }}
+            disabled={isSubmitting}
+            className={`
+              relative inline-flex h-5 w-10 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent 
+              transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary-500
+              ${value ? 'bg-primary-500' : 'bg-gray-600'}
+              ${isSubmitting ? 'opacity-50 cursor-not-allowed' : ''}
+            `}
+            role="switch"
+            aria-checked={value}
+          >
+            <span
+              className={`
+                pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-lg 
+                transition duration-200 ease-in-out
+                ${value ? 'translate-x-5' : 'translate-x-0'}
+              `}
+            />
+          </button>
         </div>
       )
     },
@@ -589,7 +620,6 @@ const AdminRoles = () => {
             <Pencil className="w-4 h-4 text-blue-400 group-hover:text-blue-300 transition" />
           </button>
 
-          {/* ✅ Delete Button with Confirmation */}
           <button
             onClick={(e) => { 
               e.stopPropagation(); 
@@ -602,7 +632,63 @@ const AdminRoles = () => {
             <TrashIcon className="w-4 h-4 text-red-400 group-hover:text-red-300 transition" />
           </button>
 
-         
+          {/* More Actions Dropdown */}
+          <div className="relative">
+            <button
+              onClick={(e) => { e.stopPropagation(); setShowActionsMenu(showActionsMenu === row.id ? null : row.id); }}
+              className="p-1.5 hover:bg-white/10 rounded-lg transition group"
+              title="More Actions"
+              disabled={isSubmitting}
+            >
+              <MoreHorizontal className="w-4 h-4 text-gray-400 group-hover:text-white transition" />
+            </button>
+
+            {showActionsMenu === row.id && (
+              <div className="absolute right-0 mt-1 w-48 bg-dark-800 rounded-lg shadow-xl border border-white/10 overflow-hidden z-50">
+                <div className="py-1">
+                  <button
+                    onClick={() => { handleDuplicate(row); }}
+                    className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-300 hover:bg-white/5 transition"
+                  >
+                    <CopyIcon className="w-4 h-4" />
+                    Duplicate Role
+                  </button>
+                  <button
+                    onClick={() => { handleToggleDefault(row); }}
+                    className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-300 hover:bg-white/5 transition"
+                  >
+                    {row.isDefault ? (
+                      <><StarOff className="w-4 h-4 text-yellow-400" /> Remove Default</>
+                    ) : (
+                      <><Star className="w-4 h-4 text-yellow-400" /> Set as Default</>
+                    )}
+                  </button>
+                  <div className="border-t border-white/10 my-1"></div>
+                  <button
+                    onClick={() => { handleViewUsers(row); }}
+                    className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-300 hover:bg-white/5 transition"
+                  >
+                    <Users className="w-4 h-4" />
+                    View Users
+                  </button>
+                  <button
+                    onClick={() => { handleCopyName(row); }}
+                    className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-300 hover:bg-white/5 transition"
+                  >
+                    <CopyIcon className="w-4 h-4" />
+                    Copy Name
+                  </button>
+                  <button
+                    onClick={() => { handleCopyId(row); }}
+                    className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-300 hover:bg-white/5 transition"
+                  >
+                    <CopyIcon className="w-4 h-4" />
+                    Copy ID
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       )
     },
@@ -705,16 +791,15 @@ const AdminRoles = () => {
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
-          
         </div>
       </div>
 
-      {/* ✅ Roles Table with Custom Columns */}
+      {/* Roles Table - REMOVED onRowClick */}
       <AdminTable
         columns={columns}
         data={roles}
         isLoading={isLoading}
-        onRowClick={handleView}
+        // onRowClick={handleView}  <-- COMMENTED OUT / REMOVED
         selectedRows={selectedRoles}
         onSelectRows={setSelectedRoles}
         showActions={false}
@@ -784,7 +869,7 @@ const AdminRoles = () => {
         )}
       </AdminModal>
 
-      {/* ✅ Delete Confirmation Modal */}
+      {/* Delete Confirmation Modal */}
       <AnimatePresence>
         {showDeleteModal && (
           <DeleteConfirmationModal
@@ -1006,8 +1091,6 @@ const RoleDetailView = ({ role, onClose }) => {
         <h4 className="text-sm font-medium text-white mb-2">Users with this role</h4>
         <p className="text-sm text-gray-400">{role.userCount || 0} users</p>
       </div>
-
-      
     </div>
   );
 };
