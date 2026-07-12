@@ -26,7 +26,7 @@ import AdminChallenges from './pages/admin/AdminChallenges';
 import AdminAnalytics from './pages/admin/AdminAnalytics';
 import AdminSettings from './pages/admin/AdminSettings';
 import AdminDesignCheck from './pages/admin/AdminDesignCheck';
-import AdminRoles from './pages/admin/AdminRoles';
+import AdminRoles from './pages/admin/roles/index';
 import AdminPermissions from './pages/admin/AdminPermissions';
 import AdminDifficulties from './pages/admin/AdminDifficulties';
 import AdminRarities from './pages/admin/AdminRarities';

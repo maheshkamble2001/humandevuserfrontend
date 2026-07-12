@@ -1,114 +1,69 @@
 // src/pages/admin/AdminRoles.jsx
-import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import React, { useState, useEffect } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   Shield,
   Plus,
-  Edit2,
-  Trash2,
-  Eye,
-  Save,
-  X,
   Crown,
-  UserCog,
   User,
   Users,
-  Lock,
-  Unlock,
   CheckCircle,
   XCircle,
-  AlertCircle,
-  Loader,
   RefreshCw,
   Search,
-  Filter,
   ChevronLeft,
   ChevronRight,
-  MoreVertical,
-  Copy,
-  Check,
   AlertTriangle,
   Pencil,
   Eye as EyeIcon,
   Trash2 as TrashIcon,
-  Copy as CopyIcon,
   MoreHorizontal,
-  UserPlus,
-  UserMinus,
-  UserCheck,
-  UserX,
-  Settings,
   Star,
   StarOff,
-  Clock,
-  Ban,
   ShieldCheck,
-  ShieldAlert,
-  ShieldQuestion,
-  BadgeCheck,
-  UserCog as UserCogIcon,
-  CheckCircle as CheckCircleIcon,
-  XCircle as XCircleIcon,
-} from 'lucide-react';
-import { useAuth } from '../../hooks/useAuth';
-import { roleService } from '../../api/services/roleService';
-import Button from '../../components/common/Button';
-import Input from '../../components/common/Input';
-import AdminModal from '../../components/admin/AdminModal';
-import AdminTable, { TableRenderer } from '../../components/admin/AdminTable';
-import AdminStatsCard from '../../components/admin/AdminStatsCard';
-import { toast } from 'react-toastify';
+  UserCog,
+} from "lucide-react";
+import { useAuth } from "../../hooks/useAuth";
+import { roleService } from "../../api/services/roleService";
+import Button from "../../components/common/Button";
+import Input from "../../components/common/Input";
+import AdminModal from "../../components/admin/AdminModal";
+import AdminTable from "../../components/admin/AdminTable";
+import AdminStatsCard from "../../components/admin/AdminStatsCard";
+import { toast } from "react-toastify";
 
 const AdminRoles = () => {
   const { user } = useAuth();
   const [roles, setRoles] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchTerm, setSearchTerm] = useState("");
   const [selectedRole, setSelectedRole] = useState(null);
   const [showModal, setShowModal] = useState(false);
-  const [modalType, setModalType] = useState('view');
+  const [modalType, setModalType] = useState("view");
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [selectedRoles, setSelectedRoles] = useState([]);
-  const [bulkAction, setBulkAction] = useState('');
+  const [bulkAction, setBulkAction] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showActionsMenu, setShowActionsMenu] = useState(null);
-  
+
   // Delete Confirmation Modal State
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null);
-  const [deleteType, setDeleteType] = useState('single');
-  const [confirmText, setConfirmText] = useState('');
+  const [deleteType, setDeleteType] = useState("single");
+  const [confirmText, setConfirmText] = useState("");
 
-  // Form state
+  // Form state - Simplified
   const [formData, setFormData] = useState({
-    name: '',
-    slug: '',
-    description: '',
-    color: '#7d26ff',
-    backgroundColor: 'rgba(125, 38, 255, 0.1)',
-    icon: 'Shield',
-    level: 1,
-    priority: 0,
-    isDefault: false,
+    name: "",
+    description: "",
     isActive: true,
-    permissions: {
-      read: true,
-      write: false,
-      delete: false,
-      manage: false,
-      users: false,
-      content: false,
-      settings: false,
-    }
   });
 
   const [formErrors, setFormErrors] = useState({});
-  const [permissionsStructure, setPermissionsStructure] = useState({});
 
   useEffect(() => {
     fetchRoles();
-    fetchPermissionsStructure();
   }, [currentPage, searchTerm]);
 
   const fetchRoles = async () => {
@@ -117,86 +72,81 @@ const AdminRoles = () => {
       const data = await roleService.getRoles({
         page: currentPage,
         limit: 20,
-        search: searchTerm
+        search: searchTerm,
       });
       setRoles(data.roles || []);
       setTotalPages(data.totalPages || 1);
     } catch (error) {
-      console.error('Error fetching roles:', error);
-      toast.error(error.message || 'Failed to load roles');
+      console.error("Error fetching roles:", error);
+      toast.error(error.message || "Failed to load roles");
     } finally {
       setIsLoading(false);
     }
   };
 
-  const fetchPermissionsStructure = async () => {
-    try {
-      const data = await roleService.getPermissionsStructure();
-      setPermissionsStructure(data);
-    } catch (error) {
-      console.error('Error fetching permissions structure:', error);
-    }
-  };
 
   // ============================================
   // DELETE CONFIRMATION HANDLERS
   // ============================================
-  
+
   const openDeleteConfirmation = (role) => {
     setDeleteTarget(role);
-    setDeleteType('single');
-    setConfirmText('');
+    setDeleteType("single");
+    setConfirmText("");
     setShowDeleteModal(true);
     setShowActionsMenu(null);
   };
 
   const openBulkDeleteConfirmation = () => {
     setDeleteTarget(selectedRoles);
-    setDeleteType('bulk');
-    setConfirmText('');
+    setDeleteType("bulk");
+    setConfirmText("");
     setShowDeleteModal(true);
   };
 
   const handleConfirmDelete = async () => {
     try {
       setIsSubmitting(true);
-      
-      if (deleteType === 'single' && deleteTarget) {
+
+      if (deleteType === "single" && deleteTarget) {
         await roleService.deleteRole(deleteTarget.id);
         toast.success(`Role "${deleteTarget.name}" deleted successfully`);
-      } else if (deleteType === 'bulk' && Array.isArray(deleteTarget)) {
+        // Remove from local state
+        setRoles((prev) => prev.filter((r) => r.id !== deleteTarget.id));
+      } else if (deleteType === "bulk" && Array.isArray(deleteTarget)) {
         await roleService.bulkUpdateRoles({
           roleIds: deleteTarget,
-          action: 'delete'
+          action: "delete",
         });
         toast.success(`Successfully deleted ${deleteTarget.length} roles`);
+        // Remove from local state
+        setRoles((prev) => prev.filter((r) => !deleteTarget.includes(r.id)));
         setSelectedRoles([]);
-        setBulkAction('');
+        setBulkAction("");
       }
-      
+
       setShowDeleteModal(false);
       setDeleteTarget(null);
-      setConfirmText('');
-      await fetchRoles();
+      setConfirmText("");
     } catch (error) {
-      console.error('Error deleting role(s):', error);
-      toast.error(error.message || 'Failed to delete role(s)');
+      console.error("Error deleting role(s):", error);
+      toast.error(error.response?.data?.error || error.message || "Failed to delete role(s)");
+      // Refresh to fix any inconsistencies
+      await fetchRoles();
     } finally {
       setIsSubmitting(false);
     }
   };
 
   const handleDeleteClick = (role) => {
-    if (role.slug === 'admin' || role.slug === 'user') {
-      toast.warning(`Cannot delete the "${role.name}" role as it's a system role.`);
+    // Check if it's a system role
+    if (role.name === "Admin" || role.name === "User") {
+      toast.warning(
+        `Cannot delete the "${role.name}" role as it's a system role.`,
+      );
       return;
     }
-    
-    if (role.isDefault) {
-      toast.warning(`Cannot delete the "${role.name}" role as it's the default role.`);
-      return;
-    }
-    
+
     openDeleteConfirmation(role);
   };
 
@@ -206,45 +156,56 @@ const AdminRoles = () => {
   const handleBulkAction = async () => {
     if (!bulkAction || selectedRoles.length === 0) return;
 
-    if (bulkAction === 'delete') {
-      const criticalRoles = roles.filter(r => 
-        selectedRoles.includes(r.id) && (r.slug === 'admin' || r.slug === 'user' || r.isDefault)
+    if (bulkAction === "delete") {
+      const criticalRoles = roles.filter(
+        (r) =>
+          selectedRoles.includes(r.id) &&
+          (r.name === "Admin" || r.name === "User"),
       );
-      
+
       if (criticalRoles.length > 0) {
-        toast.warning(`Cannot delete system roles: ${criticalRoles.map(r => r.name).join(', ')}`);
-        const nonCriticalIds = selectedRoles.filter(id => 
-          !criticalRoles.some(cr => cr.id === id)
+        toast.warning(
+          `Cannot delete system roles: ${criticalRoles.map((r) => r.name).join(", ")}`,
         );
-        
+        const nonCriticalIds = selectedRoles.filter(
+          (id) => !criticalRoles.some((cr) => cr.id === id),
+        );
+
         if (nonCriticalIds.length === 0) return;
-        
+
         setSelectedRoles(nonCriticalIds);
         if (nonCriticalIds.length > 0) {
           openBulkDeleteConfirmation();
         }
         return;
       }
-      
+
       openBulkDeleteConfirmation();
       return;
     }
 
-    if (!window.confirm(`Are you sure you want to perform "${bulkAction}" on ${selectedRoles.length} roles?`)) return;
+    if (
+      !window.confirm(
+        `Are you sure you want to perform "${bulkAction}" on ${selectedRoles.length} roles?`,
+      )
+    )
+      return;
 
     try {
       setIsSubmitting(true);
       await roleService.bulkUpdateRoles({
         roleIds: selectedRoles,
-        action: bulkAction
+        action: bulkAction,
       });
-      toast.success(`Successfully performed ${bulkAction} on ${selectedRoles.length} roles`);
+      toast.success(
+        `Successfully performed ${bulkAction} on ${selectedRoles.length} roles`,
+      );
       setSelectedRoles([]);
-      setBulkAction('');
+      setBulkAction("");
       await fetchRoles();
     } catch (error) {
-      console.error('Error performing bulk action:', error);
-      toast.error(error.message || 'Failed to perform bulk action');
+      console.error("Error performing bulk action:", error);
+      toast.error(error.message || "Failed to perform bulk action");
     } finally {
       setIsSubmitting(false);
     }
@@ -254,19 +215,45 @@ const AdminRoles = () => {
   // TOGGLE ACTIVE STATUS HANDLER
   // ============================================
   const handleToggleActive = async (role) => {
-    console.log(role)
+    console.log("Toggling role:", role);
     setShowActionsMenu(null);
+
+    const originalRole = { ...role };
+    const newStatus = !role.isActive;
+
+    // Optimistic update
+    setRoles((prevRoles) =>
+      prevRoles.map((r) =>
+        r.id === role.id ? { ...r, isActive: newStatus } : r,
+      ),
+    );
+
     try {
-      const newStatus = !role.isActive;
-      await roleService.updateRole(role.id, { 
-        ...role, 
-        isActive: newStatus 
+      const res = await roleService.updateRole(role.id, {
+        name: role.name,
+        description: role.description,
+        isActive: newStatus,
       });
-      toast.success(`Role "${role.name}" ${newStatus ? 'activated' : 'deactivated'} successfully`);
-      // await fetchRoles();
+
+      if (res.code === 200) {
+        toast.success(
+          res.message ||
+            `Role ${newStatus ? "activated" : "deactivated"} successfully`,
+        );
+      } else {
+        // Rollback on error
+        setRoles((prevRoles) =>
+          prevRoles.map((r) => (r.id === role.id ? originalRole : r)),
+        );
+        toast.error(res.message || "Failed to update role status");
+      }
     } catch (error) {
-      console.error('Error toggling role status:', error);
-      toast.error(error.message || 'Failed to toggle role status');
+      // Rollback on error
+      setRoles((prevRoles) =>
+        prevRoles.map((r) => (r.id === role.id ? originalRole : r)),
+      );
+      console.error("Error toggling role status:", error);
+      toast.error(error.response?.data?.error || error.message || "Failed to toggle role status");
     }
   };
 
@@ -276,7 +263,7 @@ const AdminRoles = () => {
 
   const handleView = (role) => {
     setSelectedRole(role);
-    setModalType('view');
+    setModalType("view");
     setShowModal(true);
     setShowActionsMenu(null);
   };
@@ -284,28 +271,12 @@ const AdminRoles = () => {
   const handleEdit = (role) => {
     setSelectedRole(role);
     setFormData({
-      name: role.name || '',
-      slug: role.slug || '',
-      description: role.description || '',
-      color: role.color || '#7d26ff',
-      backgroundColor: role.backgroundColor || 'rgba(125, 38, 255, 0.1)',
-      icon: role.icon || 'Shield',
-      level: role.level || 1,
-      priority: role.priority || 0,
-      isDefault: role.isDefault || false,
+      name: role.name || "",
+      description: role.description || "",
       isActive: role.isActive !== undefined ? role.isActive : true,
-      permissions: role.permissions || {
-        read: true,
-        write: false,
-        delete: false,
-        manage: false,
-        users: false,
-        content: false,
-        settings: false,
-      }
     });
     setFormErrors({});
-    setModalType('edit');
+    setModalType("edit");
     setShowModal(true);
     setShowActionsMenu(null);
   };
@@ -314,37 +285,17 @@ const AdminRoles = () => {
     setShowActionsMenu(null);
     try {
       const newRole = {
-        ...role,
         name: `${role.name} (Copy)`,
-        slug: `${role.slug}-copy-${Date.now()}`,
-        isDefault: false,
+        description: role.description,
         isActive: true,
       };
-      delete newRole.id;
-      delete newRole.createdAt;
-      delete newRole.updatedAt;
-      
-      await roleService.createRole(newRole);
-      toast.success('Role duplicated successfully!');
-      await fetchRoles();
-    } catch (error) {
-      console.error('Error duplicating role:', error);
-      toast.error(error.message || 'Failed to duplicate role');
-    }
-  };
 
-  const handleToggleDefault = async (role) => {
-    setShowActionsMenu(null);
-    try {
-      await roleService.updateRole(role.id, { 
-        ...role, 
-        isDefault: !role.isDefault 
-      });
-      toast.success(`Role ${role.isDefault ? 'removed from default' : 'set as default'} successfully`);
+      await roleService.createRole(newRole);
+      toast.success("Role duplicated successfully!");
       await fetchRoles();
     } catch (error) {
-      console.error('Error toggling default status:', error);
-      toast.error(error.message || 'Failed to toggle default status');
+      console.error("Error duplicating role:", error);
+      toast.error(error.response?.data?.error || error.message || "Failed to duplicate role");
     }
   };
 
@@ -356,13 +307,13 @@ const AdminRoles = () => {
   const handleCopyName = (role) => {
     setShowActionsMenu(null);
     navigator.clipboard.writeText(role.name);
-    toast.success('Role name copied to clipboard!');
+    toast.success("Role name copied to clipboard!");
   };
 
   const handleCopyId = (role) => {
     setShowActionsMenu(null);
     navigator.clipboard.writeText(role.id);
-    toast.success('Role ID copied to clipboard!');
+    toast.success("Role ID copied to clipboard!");
   };
 
   // ============================================
@@ -370,66 +321,51 @@ const AdminRoles = () => {
   // ============================================
   const handleCreate = () => {
     setFormData({
-      name: '',
-      slug: '',
-      description: '',
-      color: '#7d26ff',
-      backgroundColor: 'rgba(125, 38, 255, 0.1)',
-      icon: 'Shield',
-      level: 1,
-      priority: 0,
-      isDefault: false,
+      name: "",
+      description: "",
       isActive: true,
-      permissions: {
-        read: true,
-        write: false,
-        delete: false,
-        manage: false,
-        users: false,
-        content: false,
-        settings: false,
-      }
     });
     setFormErrors({});
-    setModalType('create');
+    setModalType("create");
     setShowModal(true);
   };
 
   const handleSubmit = async () => {
     const errors = {};
-    if (!formData.name.trim()) errors.name = 'Name is required';
-    if (!formData.slug.trim()) errors.slug = 'Slug is required';
+    if (!formData.name.trim()) errors.name = "Name is required";
 
     if (Object.keys(errors).length > 0) {
       setFormErrors(errors);
-      toast.error('Please fix form errors');
+      toast.error("Please fix form errors");
       return;
     }
 
     try {
       setIsSubmitting(true);
-      if (modalType === 'create') {
+      if (modalType === "create") {
         await roleService.createRole(formData);
-        toast.success('Role created successfully!');
+        toast.success("Role created successfully!");
       } else {
         await roleService.updateRole(selectedRole.id, formData);
-        toast.success('Role updated successfully!');
+        toast.success("Role updated successfully!");
       }
-      
+
       setShowModal(false);
       await fetchRoles();
     } catch (error) {
-      console.error('Error saving role:', error);
+      console.error("Error saving role:", error);
       
-      if (error.errors && Array.isArray(error.errors)) {
+      if (error.response?.data?.error) {
+        toast.error(error.response.data.error);
+      } else if (error.errors && Array.isArray(error.errors)) {
         const validationErrors = {};
-        error.errors.forEach(err => {
+        error.errors.forEach((err) => {
           validationErrors[err.field] = err.message;
         });
         setFormErrors(validationErrors);
-        toast.error('Please fix validation errors');
+        toast.error("Please fix validation errors");
       } else {
-        toast.error(error.message || 'Failed to save role');
+        toast.error(error.message || "Failed to save role");
       }
     } finally {
       setIsSubmitting(false);
@@ -441,23 +377,13 @@ const AdminRoles = () => {
   // ============================================
   const handleFormChange = (e) => {
     const { name, value, type, checked } = e.target;
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
-      [name]: type === 'checkbox' ? checked : value,
+      [name]: type === "checkbox" ? checked : value,
     }));
     if (formErrors[name]) {
-      setFormErrors(prev => ({ ...prev, [name]: null }));
+      setFormErrors((prev) => ({ ...prev, [name]: null }));
     }
-  };
-
-  const handlePermissionChange = (permission) => {
-    setFormData(prev => ({
-      ...prev,
-      permissions: {
-        ...prev.permissions,
-        [permission]: !prev.permissions[permission]
-      }
-    }));
   };
 
   const handleCloseModal = () => {
@@ -466,59 +392,35 @@ const AdminRoles = () => {
   };
 
   // ============================================
-  // TABLE COLUMNS WITH TOGGLE BUTTON
+  // TABLE COLUMNS
   // ============================================
   const columns = [
-    { 
-      key: 'name', 
-      label: 'Role Name', 
+    {
+      key: "name",
+      label: "Role Name",
       sortable: true,
       render: (value, row) => {
-        const Icon = getRoleIcon(row.icon);
+        const Icon = getRoleIcon(row.name);
         return (
           <div className="flex items-center gap-3">
-            <div 
-              className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
-              style={{ backgroundColor: row.backgroundColor || `${row.color}20` }}
-            >
-              <Icon className="w-5 h-5" style={{ color: row.color }} />
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 bg-primary-500/20">
+              <Icon className="w-5 h-5 text-primary-400" />
             </div>
             <div>
               <p className="font-medium text-white">{value}</p>
-              <p className="text-xs text-gray-400">Slug: {row.slug}</p>
+              {row.description && (
+                <p className="text-xs text-gray-400 truncate max-w-[200px]">
+                  {row.description}
+                </p>
+              )}
             </div>
           </div>
         );
-      }
+      },
     },
-    { 
-      key: 'level', 
-      label: 'Level', 
-      sortable: true,
-      render: (value) => (
-        <div className="flex items-center gap-1.5">
-          <ShieldCheck className="w-4 h-4 text-primary-400" />
-          <span className="font-medium text-white">Lv. {value}</span>
-        </div>
-      )
-    },
-    { 
-      key: 'priority', 
-      label: 'Priority', 
-      sortable: true,
-      render: (value) => (
-        <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-          value >= 3 ? 'bg-green-500/20 text-green-400' :
-          value >= 2 ? 'bg-yellow-500/20 text-yellow-400' :
-          'bg-gray-500/20 text-gray-400'
-        }`}>
-          {value}
-        </span>
-      )
-    },
-    { 
-      key: 'users', 
-      label: 'Users', 
+    {
+      key: "userCount",
+      label: "Users",
       sortable: true,
       render: (value) => (
         <div className="flex items-center gap-1.5">
@@ -526,31 +428,11 @@ const AdminRoles = () => {
           <span className="font-medium text-white">{value || 0}</span>
           <span className="text-xs text-gray-400">users</span>
         </div>
-      )
+      ),
     },
-    { 
-      key: 'isDefault', 
-      label: 'Default', 
-      sortable: true,
-      render: (value) => (
-        <div className="flex items-center gap-1.5">
-          {value ? (
-            <>
-              <Star className="w-4 h-4 text-yellow-400 fill-yellow-400" />
-              <span className="text-xs text-yellow-400 font-medium">Default</span>
-            </>
-          ) : (
-            <>
-              <StarOff className="w-4 h-4 text-gray-500" />
-              <span className="text-xs text-gray-500">-</span>
-            </>
-          )}
-        </div>
-      )
-    },
-    { 
-      key: 'isActive', 
-      label: 'Active', 
+    {
+      key: "isActive",
+      label: "Active",
       sortable: true,
       render: (value, row) => (
         <div className="flex items-center gap-3">
@@ -559,7 +441,9 @@ const AdminRoles = () => {
             {value ? (
               <>
                 <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
-                <span className="text-xs text-green-400 font-medium">Active</span>
+                <span className="text-xs text-green-400 font-medium">
+                  Active
+                </span>
               </>
             ) : (
               <>
@@ -568,7 +452,7 @@ const AdminRoles = () => {
               </>
             )}
           </div>
-          
+
           {/* Toggle Switch */}
           <button
             onClick={(e) => {
@@ -579,8 +463,8 @@ const AdminRoles = () => {
             className={`
               relative inline-flex h-5 w-10 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent 
               transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary-500
-              ${value ? 'bg-primary-500' : 'bg-gray-600'}
-              ${isSubmitting ? 'opacity-50 cursor-not-allowed' : ''}
+              ${value ? "bg-primary-500" : "bg-gray-600"}
+              ${isSubmitting ? "opacity-50 cursor-not-allowed" : ""}
             `}
             role="switch"
             aria-checked={value}
@@ -589,21 +473,38 @@ const AdminRoles = () => {
               className={`
                 pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-lg 
                 transition duration-200 ease-in-out
-                ${value ? 'translate-x-5' : 'translate-x-0'}
+                ${value ? "translate-x-5" : "translate-x-0"}
               `}
             />
           </button>
         </div>
-      )
+      ),
     },
-    { 
-      key: 'actions', 
-      label: 'Actions', 
+    {
+      key: "addedOn",
+      label: "Added On",
+      sortable: true,
+      render: (value) => {
+        if (!value) return <span className="text-gray-500">-</span>;
+        const date = new Date(value);
+        return (
+          <span className="text-sm text-gray-300">
+            {date.toLocaleDateString()} {date.toLocaleTimeString()}
+          </span>
+        );
+      },
+    },
+    {
+      key: "actions",
+      label: "Actions",
       sortable: false,
       render: (value, row) => (
         <div className="flex items-center gap-1.5">
           <button
-            onClick={(e) => { e.stopPropagation(); handleView(row); }}
+            onClick={(e) => {
+              e.stopPropagation();
+              handleView(row);
+            }}
             className="p-1.5 hover:bg-white/10 rounded-lg transition group"
             title="View Role"
             disabled={isSubmitting}
@@ -612,7 +513,10 @@ const AdminRoles = () => {
           </button>
 
           <button
-            onClick={(e) => { e.stopPropagation(); handleEdit(row); }}
+            onClick={(e) => {
+              e.stopPropagation();
+              handleEdit(row);
+            }}
             className="p-1.5 hover:bg-white/10 rounded-lg transition group"
             title="Edit Role"
             disabled={isSubmitting}
@@ -621,21 +525,24 @@ const AdminRoles = () => {
           </button>
 
           <button
-            onClick={(e) => { 
-              e.stopPropagation(); 
+            onClick={(e) => {
+              e.stopPropagation();
               handleDeleteClick(row);
             }}
             className="p-1.5 hover:bg-white/10 rounded-lg transition group"
             title="Delete Role"
-            disabled={isSubmitting}
+            disabled={isSubmitting || row.name === "Admin" || row.name === "User"}
           >
-            <TrashIcon className="w-4 h-4 text-red-400 group-hover:text-red-300 transition" />
+            <TrashIcon className={`w-4 h-4 ${row.name === "Admin" || row.name === "User" ? "text-gray-500 cursor-not-allowed" : "text-red-400 group-hover:text-red-300"} transition`} />
           </button>
 
           {/* More Actions Dropdown */}
           <div className="relative">
             <button
-              onClick={(e) => { e.stopPropagation(); setShowActionsMenu(showActionsMenu === row.id ? null : row.id); }}
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowActionsMenu(showActionsMenu === row.id ? null : row.id);
+              }}
               className="p-1.5 hover:bg-white/10 rounded-lg transition group"
               title="More Actions"
               disabled={isSubmitting}
@@ -647,40 +554,42 @@ const AdminRoles = () => {
               <div className="absolute right-0 mt-1 w-48 bg-dark-800 rounded-lg shadow-xl border border-white/10 overflow-hidden z-50">
                 <div className="py-1">
                   <button
-                    onClick={() => { handleDuplicate(row); }}
+                    onClick={() => {
+                      handleDuplicate(row);
+                    }}
                     className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-300 hover:bg-white/5 transition"
+                    disabled={isSubmitting}
                   >
-                    <CopyIcon className="w-4 h-4" />
+                    <Star className="w-4 h-4" />
                     Duplicate Role
-                  </button>
-                  <button
-                    onClick={() => { handleToggleDefault(row); }}
-                    className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-300 hover:bg-white/5 transition"
-                  >
-                    {row.isDefault ? (
-                      <><StarOff className="w-4 h-4 text-yellow-400" /> Remove Default</>
-                    ) : (
-                      <><Star className="w-4 h-4 text-yellow-400" /> Set as Default</>
-                    )}
                   </button>
                   <div className="border-t border-white/10 my-1"></div>
                   <button
-                    onClick={() => { handleViewUsers(row); }}
+                    onClick={() => {
+                      handleViewUsers(row);
+                    }}
                     className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-300 hover:bg-white/5 transition"
+                    disabled={isSubmitting}
                   >
                     <Users className="w-4 h-4" />
                     View Users
                   </button>
                   <button
-                    onClick={() => { handleCopyName(row); }}
+                    onClick={() => {
+                      handleCopyName(row);
+                    }}
                     className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-300 hover:bg-white/5 transition"
+                    disabled={isSubmitting}
                   >
                     <CopyIcon className="w-4 h-4" />
                     Copy Name
                   </button>
                   <button
-                    onClick={() => { handleCopyId(row); }}
+                    onClick={() => {
+                      handleCopyId(row);
+                    }}
                     className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-300 hover:bg-white/5 transition"
+                    disabled={isSubmitting}
                   >
                     <CopyIcon className="w-4 h-4" />
                     Copy ID
@@ -690,21 +599,25 @@ const AdminRoles = () => {
             )}
           </div>
         </div>
-      )
+      ),
     },
   ];
 
-  const getRoleIcon = (iconName) => {
+  const getRoleIcon = (roleName) => {
     const icons = {
-      Shield, Crown, UserCog, User, Users
+      Admin: Crown,
+      User: User,
+      Moderator: Shield,
+      Guest: User,
     };
-    return icons[iconName] || Shield;
+    return icons[roleName] || Shield;
   };
 
   // ============================================
   // PERMISSION CHECK
   // ============================================
-  const canManageRoles = user?.permissions?.roles?.manage || user?.role === 'admin';
+  const canManageRoles =
+    user?.permissions?.roles?.manage || user?.role === "admin";
 
   if (isLoading && roles.length === 0) {
     return <AdminLoadingSkeleton />;
@@ -716,7 +629,9 @@ const AdminRoles = () => {
         <div className="text-center">
           <Shield className="w-16 h-16 text-red-400 mx-auto mb-4" />
           <h2 className="text-2xl font-bold text-white">Access Denied</h2>
-          <p className="text-gray-400 mt-2">You don't have permission to manage roles.</p>
+          <p className="text-gray-400 mt-2">
+            You don't have permission to manage roles.
+          </p>
         </div>
       </div>
     );
@@ -757,19 +672,19 @@ const AdminRoles = () => {
         <AdminStatsCard
           icon={Shield}
           label="Total Roles"
-          value={roles.length || 0}
+          value={roles.filter((r) => !r.isDeleted).length || 0}
           color="primary"
         />
         <AdminStatsCard
           icon={CheckCircle}
           label="Active Roles"
-          value={roles.filter(r => r.isActive).length || 0}
+          value={roles.filter((r) => r.isActive && !r.isDeleted).length || 0}
           color="success"
         />
         <AdminStatsCard
           icon={Crown}
           label="Admin Roles"
-          value={roles.filter(r => r.slug === 'admin').length || 0}
+          value={roles.filter((r) => r.name === "Admin" && !r.isDeleted).length || 0}
           color="warning"
         />
         <AdminStatsCard
@@ -780,13 +695,13 @@ const AdminRoles = () => {
         />
       </div>
 
-      {/* Search and Filter */}
+      {/* Search */}
       <div className="glass-effect rounded-xl p-4 border border-white/20">
         <div className="flex flex-col sm:flex-row gap-3">
           <div className="flex-1">
             <Input
               icon={Search}
-              placeholder="Search roles..."
+              placeholder="Search roles by name or description..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
@@ -794,12 +709,11 @@ const AdminRoles = () => {
         </div>
       </div>
 
-      {/* Roles Table - REMOVED onRowClick */}
+      {/* Roles Table */}
       <AdminTable
         columns={columns}
-        data={roles}
+        data={roles.filter((r) => !r.isDeleted)}
         isLoading={isLoading}
-        // onRowClick={handleView}  <-- COMMENTED OUT / REMOVED
         selectedRows={selectedRoles}
         onSelectRows={setSelectedRoles}
         showActions={false}
@@ -815,11 +729,13 @@ const AdminRoles = () => {
       {totalPages > 1 && (
         <div className="flex items-center justify-between">
           <p className="text-sm text-gray-400">
-            Showing {(currentPage - 1) * 20 + 1} - {Math.min(currentPage * 20, roles.length + ((currentPage - 1) * 20))} of {roles.length + ((currentPage - 1) * 20)} roles
+            Showing {(currentPage - 1) * 20 + 1} -{" "}
+            {Math.min(currentPage * 20, roles.length + (currentPage - 1) * 20)}{" "}
+            of {roles.length + (currentPage - 1) * 20} roles
           </p>
           <div className="flex gap-2">
             <button
-              onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+              onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
               disabled={currentPage === 1 || isSubmitting}
               className="p-2 rounded-lg bg-white/5 hover:bg-white/10 transition disabled:opacity-50 disabled:cursor-not-allowed"
             >
@@ -829,7 +745,9 @@ const AdminRoles = () => {
               {currentPage} / {totalPages}
             </span>
             <button
-              onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+              onClick={() =>
+                setCurrentPage((prev) => Math.min(totalPages, prev + 1))
+              }
               disabled={currentPage === totalPages || isSubmitting}
               className="p-2 rounded-lg bg-white/5 hover:bg-white/10 transition disabled:opacity-50 disabled:cursor-not-allowed"
             >
@@ -843,26 +761,28 @@ const AdminRoles = () => {
       <AdminModal
         isOpen={showModal}
         onClose={handleCloseModal}
-        title={modalType === 'create' ? 'Create Role' : modalType === 'edit' ? 'Edit Role' : 'Role Details'}
+        title={
+          modalType === "create"
+            ? "Create Role"
+            : modalType === "edit"
+              ? "Edit Role"
+              : "Role Details"
+        }
         size="lg"
-        confirmText={modalType === 'view' ? 'Close' : 'Save'}
-        showCancel={modalType !== 'view'}
-        onConfirm={modalType === 'view' ? handleCloseModal : handleSubmit}
-        confirmVariant={modalType === 'view' ? 'outline' : 'gradient'}
+        confirmText={modalType === "view" ? "Close" : "Save"}
+        showCancel={modalType !== "view"}
+        onConfirm={modalType === "view" ? handleCloseModal : handleSubmit}
+        confirmVariant={modalType === "view" ? "outline" : "gradient"}
         loading={isSubmitting}
       >
-        {modalType === 'view' && selectedRole ? (
-          <RoleDetailView 
-            role={selectedRole} 
-            onClose={handleCloseModal}
-          />
+        {modalType === "view" && selectedRole ? (
+          <RoleDetailView role={selectedRole} onClose={handleCloseModal} />
         ) : (
           <RoleForm
             formData={formData}
             formErrors={formErrors}
             onChange={handleFormChange}
-            onPermissionChange={handlePermissionChange}
-            isEdit={modalType === 'edit'}
+            isEdit={modalType === "edit"}
             onClose={handleCloseModal}
             isSubmitting={isSubmitting}
           />
@@ -877,7 +797,7 @@ const AdminRoles = () => {
             onClose={() => {
               setShowDeleteModal(false);
               setDeleteTarget(null);
-              setConfirmText('');
+              setConfirmText("");
             }}
             onConfirm={handleConfirmDelete}
             target={deleteTarget}
@@ -905,13 +825,14 @@ const DeleteConfirmationModal = ({
   confirmText,
   setConfirmText,
 }) => {
-  const isSingleDelete = type === 'single';
-  const targetName = isSingleDelete ? target?.name : `${target?.length || 0} roles`;
-  const isDangerous = isSingleDelete && (target?.slug === 'admin' || target?.slug === 'user' || target?.isDefault);
-  
-  const isConfirmEnabled = isSingleDelete 
-    ? confirmText === target?.name 
-    : confirmText === 'DELETE';
+  const isSingleDelete = type === "single";
+  const isDangerous =
+    isSingleDelete &&
+    (target?.name === "Admin" || target?.name === "User");
+
+  const isConfirmEnabled = isSingleDelete
+    ? confirmText === target?.name
+    : confirmText === "DELETE";
 
   if (isDangerous) {
     return (
@@ -921,11 +842,14 @@ const DeleteConfirmationModal = ({
             <div className="p-2 bg-red-500/20 rounded-full">
               <Shield className="w-6 h-6 text-red-400" />
             </div>
-            <h3 className="text-xl font-bold text-white">Cannot Delete System Role</h3>
+            <h3 className="text-xl font-bold text-white">
+              Cannot Delete System Role
+            </h3>
           </div>
           <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-lg mb-4">
             <p className="text-red-400">
-              <strong>"{target?.name}"</strong> is a system role and cannot be deleted.
+              <strong>"{target?.name}"</strong> is a system role and cannot be
+              deleted.
             </p>
             <p className="text-sm text-gray-400 mt-2">
               System roles are required for the platform to function properly.
@@ -955,56 +879,61 @@ const DeleteConfirmationModal = ({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="p-6">
-          {/* Header */}
           <div className="flex items-start gap-3 mb-4">
             <div className="p-2 bg-red-500/20 rounded-full flex-shrink-0">
               <AlertTriangle className="w-6 h-6 text-red-400" />
             </div>
             <div>
               <h3 className="text-xl font-bold text-white">
-                {isSingleDelete ? 'Delete Role' : 'Delete Multiple Roles'}
+                {isSingleDelete ? "Delete Role" : "Delete Multiple Roles"}
               </h3>
               <p className="text-sm text-gray-400 mt-1">
-                {isSingleDelete 
+                {isSingleDelete
                   ? `You are about to delete the role "${target?.name}".`
-                  : `You are about to delete ${target?.length || 0} roles.`
-                }
+                  : `You are about to delete ${target?.length || 0} roles.`}
               </p>
             </div>
           </div>
 
-          {/* Warning */}
           <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-lg mb-4">
             <p className="text-sm text-red-400">
-              <strong>Warning:</strong> This action cannot be undone. All users with this role will lose their permissions.
+              <strong>Warning:</strong> This action cannot be undone. All users
+              with this role will lose their permissions.
             </p>
             {isSingleDelete && target?.userCount > 0 && (
               <p className="text-sm text-yellow-400 mt-2">
-                ⚠️ This role is currently assigned to {target.userCount} user{target.userCount > 1 ? 's' : ''}.
+                ⚠️ This role is currently assigned to {target.userCount} user
+                {target.userCount > 1 ? "s" : ""}.
               </p>
             )}
           </div>
 
-          {/* Confirmation Input */}
           <div className="mb-4">
             <p className="text-sm text-gray-300 mb-2">
               {isSingleDelete ? (
-                <>Type <strong className="text-red-400">{target?.name}</strong> to confirm:</>
+                <>
+                  Type <strong className="text-red-400">{target?.name}</strong>{" "}
+                  to confirm:
+                </>
               ) : (
-                <>Type <strong className="text-red-400">DELETE</strong> to confirm:</>
+                <>
+                  Type <strong className="text-red-400">DELETE</strong> to
+                  confirm:
+                </>
               )}
             </p>
             <input
               type="text"
               value={confirmText}
               onChange={(e) => setConfirmText(e.target.value)}
-              placeholder={isSingleDelete ? `Type "${target?.name}"` : 'Type "DELETE"'}
+              placeholder={
+                isSingleDelete ? `Type "${target?.name}"` : 'Type "DELETE"'
+              }
               className="w-full bg-white/5 rounded-lg px-4 py-2.5 text-white placeholder-gray-400 border border-white/10 focus:outline-none focus:ring-2 focus:ring-red-500"
               autoFocus
             />
           </div>
 
-          {/* Actions */}
           <div className="flex gap-3">
             <Button
               variant="danger"
@@ -1013,7 +942,7 @@ const DeleteConfirmationModal = ({
               loading={isSubmitting}
               disabled={!isConfirmEnabled || isSubmitting}
             >
-              {isSingleDelete ? 'Delete Role' : 'Delete Roles'}
+              {isSingleDelete ? "Delete Role" : "Delete Roles"}
             </Button>
             <Button
               variant="outline"
@@ -1034,62 +963,98 @@ const DeleteConfirmationModal = ({
 // ROLE DETAIL VIEW COMPONENT
 // ============================================
 const RoleDetailView = ({ role, onClose }) => {
-  const Icon = getRoleIcon(role.icon);
-  const permissionLabels = {
-    read: 'Read',
-    write: 'Write',
-    delete: 'Delete',
-    manage: 'Manage',
-    users: 'Users',
-    content: 'Content',
-    settings: 'Settings'
+  const Icon = getRoleIcon(role.name);
+  
+  // Define permissions based on role name
+  const getPermissions = (roleName) => {
+    const permissions = {
+      read: false,
+      write: false,
+      delete: false,
+      manage: false,
+      users: false,
+      content: false,
+      settings: false,
+    };
+
+    if (roleName === "Admin") {
+      permissions.read = true;
+      permissions.write = true;
+      permissions.delete = true;
+      permissions.manage = true;
+      permissions.users = true;
+      permissions.content = true;
+      permissions.settings = true;
+    } else if (roleName === "Moderator") {
+      permissions.read = true;
+      permissions.write = true;
+      permissions.delete = true;
+      permissions.users = true;
+      permissions.content = true;
+    } else if (roleName === "User") {
+      permissions.read = true;
+      permissions.write = true;
+    } else if (roleName === "Guest") {
+      permissions.read = true;
+    }
+
+    return permissions;
   };
+
+  const permissionLabels = {
+    read: "Read",
+    write: "Write",
+    delete: "Delete",
+    manage: "Manage",
+    users: "Users",
+    content: "Content",
+    settings: "Settings",
+  };
+
+  // const permissions = getPermissions(role.name);
 
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-4">
-        <div className={`p-3 rounded-2xl`} style={{ backgroundColor: role.backgroundColor || `${role.color}20` }}>
-          <Icon className={`w-10 h-10`} style={{ color: role.color }} />
+        <div className="p-3 rounded-2xl bg-primary-500/20">
+          <Icon className="w-10 h-10 text-primary-400" />
         </div>
         <div>
           <h3 className="text-xl font-bold text-white">{role.name}</h3>
           <div className="flex items-center gap-2 mt-1">
-            <span className="text-sm text-gray-400">Slug: {role.slug}</span>
+            <span className="text-sm text-gray-400">
+              {role.description || "No description"}
+            </span>
             <span className="text-xs text-gray-400">•</span>
-            <span className="text-sm text-gray-400">Level: {role.level}</span>
-            <span className="text-xs text-gray-400">•</span>
-            <span className="text-sm text-gray-400">Priority: {role.priority}</span>
-            <span className="text-xs text-gray-400">•</span>
-            <span className={`text-sm ${role.isActive ? 'text-green-400' : 'text-gray-400'}`}>
-              {role.isActive ? 'Active' : 'Inactive'}
+            <span
+              className={`text-sm ${role.isActive ? "text-green-400" : "text-gray-400"}`}
+            >
+              {role.isActive ? "Active" : "Inactive"}
             </span>
           </div>
         </div>
       </div>
 
       <div className="p-4 bg-white/5 rounded-lg">
-        <p className="text-gray-300">{role.description || 'No description provided'}</p>
+        <p className="text-gray-300">
+          {role.description || "No description provided"}
+        </p>
       </div>
 
-      <div className="p-4 bg-white/5 rounded-lg">
-        <h4 className="text-sm font-medium text-white mb-3">Permissions</h4>
-        <div className="grid grid-cols-2 gap-2">
-          {Object.entries(permissionLabels).map(([key, label]) => (
-            <div key={key} className="flex items-center gap-2 p-2 bg-white/5 rounded-lg">
-              {role.permissions?.[key] ? (
-                <CheckCircle className="w-4 h-4 text-green-400" />
-              ) : (
-                <XCircle className="w-4 h-4 text-gray-400" />
-              )}
-              <span className="text-sm text-gray-300">{label}</span>
-            </div>
-          ))}
-        </div>
-      </div>
+      
 
       <div className="p-4 bg-white/5 rounded-lg">
-        <h4 className="text-sm font-medium text-white mb-2">Users with this role</h4>
+        <h4 className="text-sm font-medium text-white mb-2">
+          Users with this role
+        </h4>
         <p className="text-sm text-gray-400">{role.userCount || 0} users</p>
+      </div>
+
+      <div className="p-4 bg-white/5 rounded-lg">
+        <h4 className="text-sm font-medium text-white mb-2">Added On</h4>
+        <p className="text-sm text-gray-400">
+          {role.addedOn ? new Date(role.addedOn).toLocaleString() : "N/A"}
+        </p>
       </div>
     </div>
   );
@@ -1098,52 +1063,27 @@ const RoleDetailView = ({ role, onClose }) => {
 // ============================================
 // ROLE FORM COMPONENT
 // ============================================
-const RoleForm = ({ 
-  formData, 
-  formErrors, 
-  onChange, 
-  onPermissionChange, 
-  isEdit, 
+const RoleForm = ({
+  formData,
+  formErrors,
+  onChange,
+  isEdit,
   onClose,
-  isSubmitting = false 
+  isSubmitting = false,
 }) => {
-  const permissionLabels = {
-    read: 'Read',
-    write: 'Write',
-    delete: 'Delete',
-    manage: 'Manage',
-    users: 'Users',
-    content: 'Content',
-    settings: 'Settings'
-  };
-
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <Input
-            label="Name"
-            name="name"
-            value={formData.name}
-            onChange={onChange}
-            error={formErrors.name}
-            placeholder="Enter role name"
-            required
-            disabled={isSubmitting}
-          />
-        </div>
-        <div>
-          <Input
-            label="Slug"
-            name="slug"
-            value={formData.slug}
-            onChange={onChange}
-            error={formErrors.slug}
-            placeholder="Enter role slug"
-            required
-            disabled={isSubmitting}
-          />
-        </div>
+      <div>
+        <Input
+          label="Role Name"
+          name="name"
+          value={formData.name}
+          onChange={onChange}
+          error={formErrors.name}
+          placeholder="Enter role name"
+          required
+          disabled={isSubmitting}
+        />
       </div>
 
       <div>
@@ -1154,108 +1094,14 @@ const RoleForm = ({
           name="description"
           value={formData.description}
           onChange={onChange}
-          rows="2"
+          rows="3"
           className="w-full bg-white/5 rounded-lg px-4 py-2.5 text-white placeholder-gray-400 border border-white/10 focus:outline-none focus:ring-2 focus:ring-primary-500"
           placeholder="Describe the role..."
           disabled={isSubmitting}
         />
       </div>
 
-      <div className="grid grid-cols-3 gap-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-300 mb-1.5">
-            Level
-          </label>
-          <input
-            type="number"
-            name="level"
-            value={formData.level}
-            onChange={onChange}
-            min="0"
-            max="100"
-            className="w-full bg-white/5 rounded-lg px-4 py-2.5 text-white border border-white/10 focus:outline-none focus:ring-2 focus:ring-primary-500"
-            disabled={isSubmitting}
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-300 mb-1.5">
-            Priority
-          </label>
-          <input
-            type="number"
-            name="priority"
-            value={formData.priority}
-            onChange={onChange}
-            min="0"
-            className="w-full bg-white/5 rounded-lg px-4 py-2.5 text-white border border-white/10 focus:outline-none focus:ring-2 focus:ring-primary-500"
-            disabled={isSubmitting}
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-300 mb-1.5">
-            Color
-          </label>
-          <div className="flex gap-2">
-            <input
-              type="color"
-              name="color"
-              value={formData.color}
-              onChange={onChange}
-              className="w-12 h-12 rounded-lg cursor-pointer bg-transparent border border-white/10"
-              disabled={isSubmitting}
-            />
-            <input
-              type="text"
-              name="color"
-              value={formData.color}
-              onChange={onChange}
-              className="flex-1 bg-white/5 rounded-lg px-4 py-2.5 text-white border border-white/10 focus:outline-none focus:ring-2 focus:ring-primary-500"
-              disabled={isSubmitting}
-            />
-          </div>
-        </div>
-      </div>
-
       <div>
-        <label className="block text-sm font-medium text-gray-300 mb-1.5">
-          Icon
-        </label>
-        <select
-          name="icon"
-          value={formData.icon}
-          onChange={onChange}
-          className="w-full bg-white/5 rounded-lg px-4 py-2.5 text-white border border-white/10 focus:outline-none focus:ring-2 focus:ring-primary-500"
-          disabled={isSubmitting}
-        >
-          <option value="Shield">Shield</option>
-          <option value="Crown">Crown</option>
-          <option value="UserCog">UserCog</option>
-          <option value="User">User</option>
-          <option value="Users">Users</option>
-        </select>
-      </div>
-
-      <div>
-        <label className="block text-sm font-medium text-gray-300 mb-2">
-          Permissions
-        </label>
-        <div className="grid grid-cols-2 gap-2">
-          {Object.entries(permissionLabels).map(([key, label]) => (
-            <label key={key} className="flex items-center gap-2 p-2 bg-white/5 rounded-lg cursor-pointer">
-              <input
-                type="checkbox"
-                checked={formData.permissions[key] || false}
-                onChange={() => onPermissionChange(key)}
-                className="w-4 h-4 bg-white/5 border border-white/20 rounded focus:ring-primary-500"
-                disabled={isSubmitting}
-              />
-              <span className="text-sm text-gray-300">{label}</span>
-            </label>
-          ))}
-        </div>
-      </div>
-
-      <div className="flex items-center gap-4">
         <label className="flex items-center gap-2 cursor-pointer">
           <input
             type="checkbox"
@@ -1267,17 +1113,6 @@ const RoleForm = ({
           />
           <span className="text-sm text-gray-300">Active</span>
         </label>
-        <label className="flex items-center gap-2 cursor-pointer">
-          <input
-            type="checkbox"
-            name="isDefault"
-            checked={formData.isDefault}
-            onChange={onChange}
-            className="w-4 h-4 bg-white/5 border border-white/20 rounded focus:ring-primary-500"
-            disabled={isSubmitting}
-          />
-          <span className="text-sm text-gray-300">Default Role</span>
-        </label>
       </div>
     </div>
   );
@@ -1286,11 +1121,14 @@ const RoleForm = ({
 // ============================================
 // HELPER FUNCTIONS
 // ============================================
-const getRoleIcon = (iconName) => {
+const getRoleIcon = (roleName) => {
   const icons = {
-    Shield, Crown, UserCog, User, Users
+    Admin: Crown,
+    User: User,
+    Moderator: Shield,
+    Guest: User,
   };
-  return icons[iconName] || Shield;
+  return icons[roleName] || Shield;
 };
 
 // ============================================
@@ -1306,7 +1144,7 @@ const AdminLoadingSkeleton = () => (
       <div className="h-10 w-32 bg-white/5 rounded"></div>
     </div>
     <div className="grid grid-cols-4 gap-4">
-      {[1, 2, 3, 4].map(i => (
+      {[1, 2, 3, 4].map((i) => (
         <div key={i} className="h-32 bg-white/5 rounded-xl"></div>
       ))}
     </div>

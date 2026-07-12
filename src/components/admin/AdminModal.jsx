@@ -206,12 +206,15 @@ const AdminModal = ({
     if (onConfirm) {
       setIsLoading(true);
       try {
-        await onConfirm();
-        setSuccess('Operation completed successfully');
-        setTimeout(() => {
-          setSuccess(null);
-          handleClose();
-        }, 1500);
+        const res = await onConfirm();
+        console.log(res);
+        if(res){
+          setSuccess('Operation completed successfully');
+          setTimeout(() => {
+            setSuccess(null);
+            handleClose();
+          }, 1500);
+        }
       } catch (err) {
         setError(err.message || 'An error occurred');
         setTimeout(() => setError(null), 3000);
